@@ -1,0 +1,4 @@
+terraform/secrets.auto.tfvars
+terraform/.terraform*
+ansible/vault.yml
+ansible/.vault_pass

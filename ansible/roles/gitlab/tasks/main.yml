@@ -1,0 +1,9 @@
+- name: Install GitLab
+  shell: |
+    curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
+    apt-get install -y gitlab-ce
+  args:
+    creates: /usr/bin/gitlab-ctl
+
+- name: Configure GitLab
+  command: gitlab-ctl reconfigure

@@ -1,0 +1,79 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - 'ansible/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - 'ansible/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: terraform
+
+      - name: Terraform Plan
+        run: terraform plan -var="certificate_arn=${{ secrets.ACM_CERTIFICATE_ARN }}"
+        working-directory: terraform
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve -var="certificate_arn=${{ secrets.ACM_CERTIFICATE_ARN }}"
+        working-directory: terraform
+
+      - name: Save Terraform outputs
+        if: github.ref == 'refs/heads/main'
+        run: terraform output -json > outputs.json
+        working-directory: terraform
+
+      - name: Generate Ansible inventory
+        if: github.ref == 'refs/heads/main'
+        run: |
+          CAPROVER_IP=$(jq -r '.caprover_instance_ip.value' outputs.json)
+          GITLAB_IP=$(jq -r '.gitlab_instance_ip.value' outputs.json)
+          echo "[caprover]" > ansible/inventory.ini
+          echo "$CAPROVER_IP" >> ansible/inventory.ini
+          echo "[gitlab]" >> ansible/inventory.ini
+          echo "$GITLAB_IP" >> ansible/inventory.ini
+        working-directory: terraform
+
+      - name: Set up SSH
+        if: github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $(jq -r '.caprover_instance_ip.value' terraform/outputs.json) >> ~/.ssh/known_hosts
+          ssh-keyscan -H $(jq -r '.gitlab_instance_ip.value' terraform/outputs.json) >> ~/.ssh/known_hosts
+
+      - name: Run Ansible Playbooks
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ansible-playbook -i inventory.ini -u ubuntu playbooks/caprover.yml
+          ansible-playbook -i inventory.ini -u ubuntu playbooks/gitlab.yml
+        working-directory: ansible

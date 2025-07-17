@@ -1,0 +1,4 @@
+- hosts: caprover
+  become: yes
+  roles:
+    - caprover

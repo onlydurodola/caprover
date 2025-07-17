@@ -1,0 +1,30 @@
+- name: Install Docker
+  apt:
+    name: docker.io
+    state: present
+
+- name: Install CapRover
+  shell: |
+    curl -sSL https://caprover.com/caprover.sh | bash
+  args:
+    creates: /usr/local/bin/caprover
+
+- name: Set CapRover password
+  command: caprover setpassword
+  environment:
+    CAPROVER_PASSWORD: "{{ vault_caprover_password }}"
+  no_log: true
+  args:
+    creates: /etc/caprover-password-set
+
+- name: Configure CapRover
+  command: caprover serversetup
+  environment:
+    CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
+  args:
+    creates: /captain/data/config-captain.json
+
+- name: Set API Key if available
+  command: caprover login --apiKey "{{ vault_caprover_api_key }}"
+  when: vault_caprover_api_key | length > 0
+  no_log: true
