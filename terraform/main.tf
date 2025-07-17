@@ -23,7 +23,7 @@ module "ec2" {
   source             = "./modules/ec2"
   vpc_id             = module.vpc.vpc_id
   public_subnet_ids  = module.vpc.public_subnet_ids
-  security_group_ids = [
+  security_groups = [
     module.security_groups.caprover_sg_id,
     module.security_groups.gitlab_sg_id,
     module.security_groups.internal_sg_id

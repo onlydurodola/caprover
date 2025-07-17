@@ -1,6 +1,10 @@
-- name: Install Docker
+- name: Install Docker ans other system requirements
   apt:
-    name: docker.io
+    name:
+      - docker.io
+      - docker-compose
+      - curl
+      - git
     state: present
 
 - name: Install CapRover
@@ -9,6 +13,11 @@
   args:
     creates: /usr/local/bin/caprover
 
+- name: Ensure docker is started
+  systemd:
+    name: docker
+    state: started
+    enabled: true
 - name: Set CapRover password
   command: caprover setpassword
   environment:

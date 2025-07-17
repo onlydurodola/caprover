@@ -1,3 +1,18 @@
+
+- name: Update and upgrade system
+  apt:
+    upgrade: dist
+    update_cache: true
+
+- name: Install prerequisites
+  apt:
+    name:
+      - curl
+      - openssh-server
+      - ca-certificates
+      - postfix
+    state: present
+
 - name: Install GitLab
   shell: |
     curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
@@ -7,3 +22,7 @@
 
 - name: Configure GitLab
   command: gitlab-ctl reconfigure
+
+- name: Set root password
+  command: gitlab-rails runner "user = User.find(1); user.password = '{{ vault_gitlab_root_password }}'; user.password_confirmation = '{{ vault_gitlab_root_password }}'; user.save!"
+  no_log: true
