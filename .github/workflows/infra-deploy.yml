@@ -33,17 +33,18 @@ jobs:
 
       - name: Setup Terraform Variables
         run: |
-          IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed "s/,/\", \"/g")
-          echo "allowed_ips = [\"$IPS_STRING\"]" > secrets.auto.tfvars
-          echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
-          echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
-          cat secrets.auto.tfvars  # Debug
+          cat <<EOF > secrets.auto.tfvars
+          allowed_ips = ${{ secrets.ALLOWED_IPS }}
+          certificate_arn = "${{ secrets.ACM_CERTIFICATE_ARN }}"
+          domain_name = "${{ secrets.DOMAIN_NAME }}"
+          EOF
+          cat secrets.auto.tfvars
 
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl
 
       - name: Terraform Format
-        run: terraform fmt -check
+        run: terraform fmt -check -recursive
 
       - name: Terraform Validate
         run: terraform validate
