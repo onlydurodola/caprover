@@ -25,3 +25,6 @@ variable "domain_name" {
 
 variable "certificate_arn" {
 }
+variable "env" {
+  default = "prod"
+}

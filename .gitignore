@@ -1,4 +1,17 @@
 terraform/secrets.auto.tfvars
 terraform/.terraform*
+# Terraform ignores
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfvars
+terraform/.terraform.lock.hcl
+
+# Ansible ignores
 ansible/vault.yml
 ansible/.vault_pass
+
+# Local files
+.terraform/
+.terraform.lock.hcl
+*.log

@@ -132,7 +132,7 @@ resource "aws_security_group" "alb" {
     from_port = 80
     to_port = 80
     protocol = "tcp"
-    security_groups = [aws_security_group.caprover.id]
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = {

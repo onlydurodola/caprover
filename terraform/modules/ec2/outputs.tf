@@ -5,6 +5,10 @@ output "caprover_instance_ip" {
 output "gitlab_instance_ip" {
   value = aws_instance.gitlab.public_ip
 }
-output "internal_sg_id" {
-  value = aws_security_group.internal.id
+output "caprover_instance_id" {
+  value = aws_instance.caprover.id
+}
+
+output "gitlab_instance_id" {
+  value = aws_instance.gitlab.id
 }
