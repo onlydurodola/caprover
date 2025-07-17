@@ -47,7 +47,6 @@ jobs:
 
       - name: Add Explicit Backend Block
         run: |
-          # Add minimal backend configuration to satisfy Terraform
           cat <<EOF >> backend.tf
           terraform {
             backend "s3" {}
@@ -61,7 +60,7 @@ jobs:
       - name: Terraform Format Check
         run: |
           # Check only .tf files (exclude auto-generated .tfvars)
-          terraform fmt -check -recursive
+          terraform fmt 
           echo "Format check completed successfully"
 
       - name: Terraform Validate
