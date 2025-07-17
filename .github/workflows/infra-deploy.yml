@@ -14,7 +14,7 @@ jobs:
     defaults:
       run:
         working-directory: terraform
-        
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -31,12 +31,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-north-1
 
-      # Create Terraform secrets file from GitHub Secrets
       - name: Setup Terraform Variables
         run: |
-          echo "allowed_ips = [\"$(echo '${{ secrets.ALLOWED_IPS }}' | sed 's/,/", "/g')\"]" > secrets.auto.tfvars
+          IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed "s/,/\", \"/g")
+          echo "allowed_ips = [\"$IPS_STRING\"]" > secrets.auto.tfvars
           echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
           echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
+          cat secrets.auto.tfvars  # Debug
 
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl
