@@ -7,6 +7,7 @@ on:
     paths:
       - 'terraform/**'
       - 'ansible/**'
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -33,18 +34,24 @@ jobs:
 
       - name: Setup Terraform Variables
         run: |
-          cat <<EOF > secrets.auto.tfvars
-          allowed_ips = ${{ secrets.ALLOWED_IPS }}
-          certificate_arn = "${{ secrets.ACM_CERTIFICATE_ARN }}"
-          domain_name = "${{ secrets.DOMAIN_NAME }}"
-          EOF
+          # Format allowed_ips as proper Terraform list
+          IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed "s/,/\", \"/g")
+          echo "allowed_ips = [\"$IPS_STRING\"]" > secrets.auto.tfvars
+          
+          echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
+          echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
+          
+          # Debug: show generated file
+          echo "Generated secrets.auto.tfvars:"
           cat secrets.auto.tfvars
 
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl
 
       - name: Terraform Format
-        run: terraform fmt -check -recursive
+        run: |
+          # Only check .tf files, ignore auto-generated .tfvars
+          terraform fmt -check -recursive -type=tf
 
       - name: Terraform Validate
         run: terraform validate
@@ -52,22 +59,16 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan
 
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve tfplan
-
-      # Capture outputs for Ansible
       - name: Save Terraform Outputs
-        if: github.ref == 'refs/heads/main'
+        if: ${{ github.ref == 'refs/heads/main' }}
         run: |
           terraform output -raw caprover_instance_ip > ../ansible/caprover_ip
           terraform output -raw gitlab_instance_ip > ../ansible/gitlab_ip
           echo "CAPROVER_IP=$(cat ../ansible/caprover_ip)" >> $GITHUB_ENV
           echo "GITLAB_IP=$(cat ../ansible/gitlab_ip)" >> $GITHUB_ENV
 
-      # Generate Ansible inventory
       - name: Create Ansible Inventory
-        if: github.ref == 'refs/heads/main'
+        if: ${{ github.ref == 'refs/heads/main' }}
         working-directory: ansible
         run: |
           echo "[caprover]" > inventory.ini
@@ -76,30 +77,28 @@ jobs:
           echo "$(cat gitlab_ip)" >> inventory.ini
           rm caprover_ip gitlab_ip
 
-      # Configure SSH access
       - name: Setup SSH Configuration
-        if: github.ref == 'refs/heads/main'
+        if: ${{ github.ref == 'refs/heads/main' }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          chmod 400 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ env.CAPROVER_IP }} >> ~/.ssh/known_hosts
           ssh-keyscan -H ${{ env.GITLAB_IP }} >> ~/.ssh/known_hosts
 
-      # Run Ansible playbooks
       - name: Run Ansible Configuration
-        if: github.ref == 'refs/heads/main'
+        if: ${{ github.ref == 'refs/heads/main' }}
         working-directory: ansible
         run: |
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
           chmod 600 .vault_pass
-          
+
           ansible-playbook -i inventory.ini playbooks/caprover.yml \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }}" \
             --vault-password-file .vault_pass
-          
+
           ansible-playbook -i inventory.ini playbooks/gitlab.yml \
             --extra-vars "vault_gitlab_root_password='${{ secrets.GITLAB_ROOT_PASSWORD }}'" \
             --vault-password-file .vault_pass
-          
+
           rm .vault_pass
