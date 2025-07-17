@@ -25,7 +25,7 @@ module "ec2" {
   public_subnet_ids  = module.vpc.public_subnet_ids
   security_group_ids = [
     module.security_groups.caprover_sg_id,
-    module.security_groups.gitlab_sg_id
+    module.security_groups.gitlab_sg_id,
     module.security_groups.internal_sg_id
   ]
 }
