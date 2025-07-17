@@ -52,4 +52,4 @@ module "route53" {
   alb_zone_id  = module.alb.alb_zone_id
   gitlab_ip    = module.ec2.gitlab_instance_ip
 }
-#
+

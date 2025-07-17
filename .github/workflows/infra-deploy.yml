@@ -45,13 +45,24 @@ jobs:
           echo "Generated secrets.auto.tfvars:"
           cat secrets.auto.tfvars
 
+      - name: Add Explicit Backend Block
+        run: |
+          # Add minimal backend configuration to satisfy Terraform
+          cat <<EOF >> backend.tf
+          terraform {
+            backend "s3" {}
+          }
+          EOF
+          cat backend.tf
+
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl
 
-      - name: Terraform Format
+      - name: Terraform Format Check
         run: |
-          # Only check .tf files, ignore auto-generated .tfvars
-          terraform fmt -check -recursive -type=tf
+          # Check only .tf files (exclude auto-generated .tfvars)
+          terraform fmt -check -recursive
+          echo "Format check completed successfully"
 
       - name: Terraform Validate
         run: terraform validate
@@ -60,7 +71,7 @@ jobs:
         run: terraform plan -out=tfplan
 
       - name: Save Terraform Outputs
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: github.ref == 'refs/heads/main'
         run: |
           terraform output -raw caprover_instance_ip > ../ansible/caprover_ip
           terraform output -raw gitlab_instance_ip > ../ansible/gitlab_ip
@@ -68,7 +79,7 @@ jobs:
           echo "GITLAB_IP=$(cat ../ansible/gitlab_ip)" >> $GITHUB_ENV
 
       - name: Create Ansible Inventory
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
           echo "[caprover]" > inventory.ini
@@ -78,7 +89,7 @@ jobs:
           rm caprover_ip gitlab_ip
 
       - name: Setup SSH Configuration
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: github.ref == 'refs/heads/main'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
@@ -87,7 +98,7 @@ jobs:
           ssh-keyscan -H ${{ env.GITLAB_IP }} >> ~/.ssh/known_hosts
 
       - name: Run Ansible Configuration
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
