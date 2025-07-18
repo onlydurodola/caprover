@@ -133,7 +133,7 @@ jobs:
         run: |
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
           chmod 600 .vault_pass
-          ansible-playbook -i inventory.ini playbook.yml \
+          ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file .vault_pass \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }}"
           rm .vault_pass

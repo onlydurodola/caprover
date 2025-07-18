@@ -1,3 +1,7 @@
+- name: Set Python interpreter
+  set_fact:
+    ansible_python_interpreter: /usr/bin/python3.8
+
 - name: Install prerequisites
   apt:
     name:
