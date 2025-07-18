@@ -63,8 +63,6 @@
 
 - name: Clean GitLab logs to free disk space
   command: truncate -s 0 /var/log/gitlab/*.log
-  args:
-    warn: false
 
 - name: Resize filesystem after EBS expansion
   command: resize2fs /dev/xvda1
