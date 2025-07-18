@@ -134,12 +134,10 @@ jobs:
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
           chmod 600 .vault_pass
           ansible-playbook -i inventory.ini playbook.yml \
-            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }}" \
-            --vault-password-file .vault_pass
-          ansible-playbook -i inventory.ini playbook.yml \
-            --extra-vars "vault_gitlab_root_password='${{ secrets.GITLAB_ROOT_PASSWORD }}'" \
-            --vault-password-file .vault_pass
+            --vault-password-file .vault_pass \
+            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }}"
           rm .vault_pass
+
       - name: Revoke Runner IP from Security Groups
         if: always()
         run: |
@@ -157,3 +155,4 @@ jobs:
             --port 22 \
             --cidr ${{ env.RUNNER_IP }}/32 \
             --region eu-north-1 || echo "Revoke failed, but continuing"
+            #
