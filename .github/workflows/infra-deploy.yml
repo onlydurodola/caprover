@@ -88,9 +88,9 @@ jobs:
         working-directory: ansible
         run: |
           echo "[caprover]" > inventory.ini
-          echo "${{ env.CAPROVER_IP }}" >> inventory.ini
+          echo "${{ env.CAPROVER_IP }} ansible_user=ubuntu" >> inventory.ini
           echo "[gitlab]" >> inventory.ini
-          echo "${{ env.GITLAB_IP }}" >> inventory.ini
+          echo "${{ env.GITLAB_IP }} ansible_user=ubuntu" >> inventory.ini
           cat inventory.ini
       
       - name: Get Runner IP
@@ -125,6 +125,7 @@ jobs:
           chmod 400 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ env.CAPROVER_IP }} >> ~/.ssh/known_hosts
           ssh-keyscan -H ${{ env.GITLAB_IP }} >> ~/.ssh/known_hosts
+          
 
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
