@@ -62,7 +62,7 @@ resource "aws_lb_target_group" "caprover_dashboard" {
 resource "aws_lb_target_group" "gitlab_http" {
   name        = "gitlab-http-tg"
   port        = 80
-  protocol    = "HTTP"
+  protocol    = "TCP"
   vpc_id      = var.vpc_id
   target_type = "instance"
 

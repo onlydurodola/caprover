@@ -61,9 +61,8 @@
     block: |
       nginx['listen_port'] = 80
       nginx['listen_https'] = false
-      nginx['proxy_protocol'] = true
-      nginx['real_ip_trusted_addresses'] = ['{{ vpc_cidr }}']  # VPC CIDR
-      nginx['real_ip_header'] = 'proxy_protocol'
+      nginx['real_ip_trusted_addresses'] = ['{{ vpc_cidr }}']
+      nginx['real_ip_header'] = 'X-Forwarded-For' 
     marker: "# {mark} ANSIBLE MANAGED BLOCK - PROXY SETTINGS"
 
 - name: Configure trusted proxies
