@@ -72,17 +72,15 @@ jobs:
       - name: Save Terraform Outputs
         if: github.ref == 'refs/heads/main'
         run: |
-          # Get outputs and trim any whitespace
-          CAPROVER_IP=$(terraform output -raw caprover_instance_ip | tr -d '\n')
-          GITLAB_IP=$(terraform output -raw gitlab_instance_ip | tr -d '\n')
-
-          # Set environment variables
+          terraform output -raw caprover_instance_ip > caprover_ip.txt
+          terraform output -raw gitlab_instance_ip > gitlab_ip.txt
+          CAPROVER_IP=$(cat caprover_ip.txt | tr -d '\n')
+          GITLAB_IP=$(cat gitlab_ip.txt | tr -d '\n')
           echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
           echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
-
-          # Debug outputs
           echo "Debug: CAPROVER_IP: $CAPROVER_IP"
           echo "Debug: GITLAB_IP: $GITLAB_IP"
+          rm caprover_ip.txt gitlab_ip.txt
 
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
@@ -92,7 +90,7 @@ jobs:
           echo "${{ env.CAPROVER_IP }}" >> inventory.ini
           echo "[gitlab]" >> inventory.ini
           echo "${{ env.GITLAB_IP }}" >> inventory.ini
-          cat inventory.ini # Optional: for debugging
+          cat inventory.ini
 
       - name: Setup SSH Configuration
         if: github.ref == 'refs/heads/main'
