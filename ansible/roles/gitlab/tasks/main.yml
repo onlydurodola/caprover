@@ -46,9 +46,18 @@
 - name: Set external_url in gitlab.rb
   lineinfile:
     path: /etc/gitlab/gitlab.rb
-    line: "external_url 'http://gitlab.{{ domain_name }}'"
+    line: "external_url 'https://gitlab.{{ domain_name }}'"
     state: present
     create: true
+
+- name: Configure HTTPS for GitLab
+  blockinfile:
+    path: /etc/gitlab/gitlab.rb
+    block: |
+      nginx['redirect_http_to_https'] = true
+      nginx['ssl_certificate'] = "/etc/gitlab/ssl/{{ domain_name }}.crt"
+      nginx['ssl_certificate_key'] = "/etc/gitlab/ssl/{{ domain_name }}.key"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - GITLAB SSL"
 
 - name: Configure GitLab
   command: gitlab-ctl reconfigure

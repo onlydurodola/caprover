@@ -94,11 +94,14 @@
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /captain:/captain
+    network_mode: host
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
       ACCEPTED_TERMS: "true"
       MAIN_NODE_IP_ADDRESS: "{{ ansible_host }}"
+      BY_PASS_PROXY_CHECK: 'TRUE' 
+      CAPROVER_MACHINE_HOST: "{{ ansible_host }}"
     restart_policy: always
     state: started
 

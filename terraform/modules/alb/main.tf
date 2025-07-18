@@ -110,8 +110,13 @@ resource "aws_lb_listener" "http" {
     fixed_response {
       content_type = "text/plain"
       status_code  = "404"
-      message_body = "Not Found"
+      message_body = "Route not found. Please check the URL."
     }
+  }
+
+  # Add explicit deny for invalid paths
+  lifecycle {
+    ignore_changes = [default_action[0].order]
   }
 }
 
@@ -143,6 +148,31 @@ resource "aws_lb_listener" "dashboard" {
 resource "aws_lb_listener_rule" "gitlab_http" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 100
+
+  health_check {
+    path                = "/explore"  # More reliable endpoint
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200,302"
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.gitlab_http.arn
+  }
+
+  condition {
+    host_header {
+      values = ["gitlab.${var.domain_name}"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "gitlab_https" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 150  # Between existing rules
 
   action {
     type             = "forward"
