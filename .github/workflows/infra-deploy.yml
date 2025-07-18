@@ -77,8 +77,12 @@ jobs:
         run: |
           terraform output -raw caprover_instance_ip > ../ansible/caprover_ip
           terraform output -raw gitlab_instance_ip > ../ansible/gitlab_ip
-          echo "CAPROVER_IP=$(cat ../ansible/caprover_ip)" >> $GITHUB_ENV
-          echo "GITLAB_IP=$(cat ../ansible/gitlab_ip)" >> $GITHUB_ENV
+          echo "CAPROVER_IP<<EOF" >> $GITHUB_ENV
+          cat ../ansible/caprover_ip
+          echo "EOF" >> $GITHUB_ENV
+          echo "GITLAB_IP<<EOF" >> $GITHUB_ENV
+          cat ../ansible/gitlab_ip
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
