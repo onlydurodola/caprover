@@ -65,7 +65,7 @@ resource "aws_lb_target_group" "gitlab_http" {
   vpc_id   = var.vpc_id
 
   health_check {
-    path                = "/users/sign_in"
+    path                = "/explore"
     interval            = 30
     timeout             = 10
     healthy_threshold   = 2
@@ -148,15 +148,6 @@ resource "aws_lb_listener" "dashboard" {
 resource "aws_lb_listener_rule" "gitlab_http" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 100
-
-  health_check {
-    path                = "/explore"  # More reliable endpoint
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    matcher             = "200,302"
-  }
 
   action {
     type             = "forward"
