@@ -51,7 +51,7 @@ resource "aws_lb_target_group" "caprover_dashboard" {
   vpc_id   = var.vpc_id
 
   health_check {
-    path                = "/app/captain/" # CapRover dashboard path
+    path                = "/app/captain/"
     interval            = 30
     timeout             = 5
     healthy_threshold   = 2
