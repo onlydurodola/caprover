@@ -78,10 +78,10 @@ jobs:
           terraform output -raw caprover_instance_ip | sed 's/::debug::.*//' > ../ansible/caprover_ip
           terraform output -raw gitlab_instance_ip | sed 's/::debug::.*//' > ../ansible/gitlab_ip
           echo "CAPROVER_IP<<EOF" >> $GITHUB_ENV
-          cat ../ansible/caprover_ip
+          cat ../ansible/caprover_ip >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
           echo "GITLAB_IP<<EOF" >> $GITHUB_ENV
-          cat ../ansible/gitlab_ip
+          cat ../ansible/gitlab_ip >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       - name: Create Ansible Inventory
