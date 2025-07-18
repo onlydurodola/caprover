@@ -9,7 +9,7 @@ resource "aws_lb" "main" {
   }
 }
 
-# Target group for CapRover's HTTP port (80)
+# Target Groups
 resource "aws_lb_target_group" "caprover_http" {
   name     = "caprover-http-tg"
   port     = 80
@@ -26,7 +26,6 @@ resource "aws_lb_target_group" "caprover_http" {
   }
 }
 
-# Target group for CapRover's HTTPS port (443)
 resource "aws_lb_target_group" "caprover_https" {
   name     = "caprover-https-tg"
   port     = 443
@@ -43,7 +42,6 @@ resource "aws_lb_target_group" "caprover_https" {
   }
 }
 
-# Target group for CapRover's dashboard port (3000)
 resource "aws_lb_target_group" "caprover_dashboard" {
   name     = "caprover-dashboard-tg"
   port     = 3000
@@ -60,7 +58,23 @@ resource "aws_lb_target_group" "caprover_dashboard" {
   }
 }
 
-# Attach CapRover instance to the target groups
+resource "aws_lb_target_group" "gitlab_http" {
+  name     = "gitlab-http-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = var.vpc_id
+
+  health_check {
+    path                = "/users/sign_in"
+    interval            = 30
+    timeout             = 10
+    healthy_threshold   = 2
+    unhealthy_threshold = 5
+    matcher             = "200,302"
+  }
+}
+
+# Target Group Attachments
 resource "aws_lb_target_group_attachment" "caprover_http" {
   target_group_arn = aws_lb_target_group.caprover_http.arn
   target_id        = var.caprover_instance_id
@@ -79,28 +93,34 @@ resource "aws_lb_target_group_attachment" "caprover_dashboard" {
   port             = 3000
 }
 
-# ALB Listener for HTTP (redirect to HTTPS)
+resource "aws_lb_target_group_attachment" "gitlab_http" {
+  target_group_arn = aws_lb_target_group.gitlab_http.arn
+  target_id        = var.gitlab_instance_id
+  port             = 80
+}
+
+# Listeners
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      status_code  = "404"
+      message_body = "Not Found"
     }
   }
 }
 
-# ALB Listener for HTTPS (forward to CapRover's HTTPS target group)
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.main.arn
   port              = 443
   protocol          = "HTTPS"
   certificate_arn   = var.certificate_arn
+  ssl_policy        = "ELBSecurityPolicy-2016-08"  # Updated SSL policy
 
   default_action {
     type             = "forward"
@@ -108,7 +128,6 @@ resource "aws_lb_listener" "https" {
   }
 }
 
-# ALB Listener for CapRover Dashboard (port 3000)
 resource "aws_lb_listener" "dashboard" {
   load_balancer_arn = aws_lb.main.arn
   port              = 3000
@@ -120,38 +139,51 @@ resource "aws_lb_listener" "dashboard" {
   }
 }
 
-resource "aws_lb_target_group" "gitlab_http" {
-  name     = "gitlab-http-tg"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
-  health_check {
-    path                = "/users/sign_in"
-    protocol            = "HTTP"
-    interval            = 30
-    timeout             = 10
-    healthy_threshold   = 2
-    unhealthy_threshold = 5
-    matcher             = "200,302"
-  }
-}
-
-resource "aws_lb_target_group_attachment" "gitlab_http" {
-  target_group_arn = aws_lb_target_group.gitlab_http.arn
-  target_id        = var.gitlab_instance_id
-  port             = 80
-}
-
+# Listener Rules
 resource "aws_lb_listener_rule" "gitlab_http" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 100
+
   action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.gitlab_http.arn
   }
+
   condition {
     host_header {
       values = ["gitlab.${var.domain_name}"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "caprover_dashboard" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 200
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.caprover_dashboard.arn
+  }
+
+  condition {
+    host_header {
+      values = ["captain.${var.domain_name}"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "main_domain" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 300
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.caprover_https.arn
+  }
+
+  condition {
+    host_header {
+      values = [var.domain_name]
     }
   }
 }

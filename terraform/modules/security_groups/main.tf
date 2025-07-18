@@ -8,7 +8,7 @@ resource "aws_security_group" "internal" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = [var.vpc_cidr] # Allow all VPC traffic
+    cidr_blocks = [var.vpc_cidr]
   }
 
   ingress {
@@ -175,6 +175,15 @@ resource "aws_security_group" "alb" {
   description = "ALB Security Group"
   vpc_id      = var.vpc_id
 
+  # Ingress Rules
+  ingress {
+    description = "HTTP from anywhere"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   ingress {
     description = "HTTPS from anywhere"
     from_port   = 443
@@ -191,12 +200,13 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Egress Rules - Allow all traffic to VPC
   egress {
-    description = "Outbound to CapRover"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [var.vpc_cidr]
+    description      = "Outbound to instances"
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = [var.vpc_cidr]
   }
 
   tags = {

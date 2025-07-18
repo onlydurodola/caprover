@@ -42,19 +42,16 @@ jobs:
 
       - name: Setup Terraform Variables
         run: |
-          # Format IPs as Terraform list
           IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed 's/,/", "/g')
           echo "allowed_ips = [\"$IPS_STRING\"]" > secrets.auto.tfvars
           echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
           echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
           echo "aws_region = \"eu-north-1\"" >> secrets.auto.tfvars
           echo "waf_enabled = \"${{ secrets.ENABLE_WAF || 'false' }}\"" >> secrets.auto.tfvars
-          echo "Generated secrets.auto.tfvars:"
           cat secrets.auto.tfvars
 
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl -input=false -reconfigure
-      
       
       - name: Terraform Format Check
         run: find . -name "*.tf" -exec terraform fmt -check -diff {} +
