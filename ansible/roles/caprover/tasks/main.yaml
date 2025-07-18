@@ -55,7 +55,7 @@
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
     restart_policy: always
-    
+
 - name: Install Node.js
   apt:
     name: nodejs
@@ -69,4 +69,9 @@
 - name: Install CapRover CLI
   npm:
     name: caprover
-    global: yes
+    global: true
+
+- name: Configure CapRover dashboard to use subdomain
+  command: caprover serversetup --caproverUrl http://captain.{{ domain_name }}:3000
+  args:
+    creates: /captain/data/config-captain.json
