@@ -28,3 +28,9 @@ variable "certificate_arn" {
 variable "env" {
   default = "prod"
 }
+
+variable "waf_enabled" {
+  description = "Enable or disable WAF"
+  type        = bool
+  default     = true
+}

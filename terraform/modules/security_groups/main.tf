@@ -1,14 +1,22 @@
 resource "aws_security_group" "internal" {
-  name = "${var.env}-internal-sg"
+  name        = "${var.env}-internal-sg"
   description = "Allow communication between CapRover and GitLab"
-  vpc_id = var.vpc_id
+  vpc_id      = var.vpc_id
 
   ingress {
     description = "All internal traffic"
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = [var.vpc_cidr] # Allow all VPC traffic
+  }
+
+  ingress {
+    description = "VPC Endpoint access"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = {
@@ -22,11 +30,11 @@ resource "aws_security_group" "caprover" {
   vpc_id      = var.vpc_id
 
   ingress {
-    description     = "SSH from allowed IPs"
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    cidr_blocks     = var.allowed_ips
+    description = "SSH from allowed IPs"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_ips
   }
 
   ingress {
@@ -54,51 +62,51 @@ resource "aws_security_group" "caprover" {
   }
 
   ingress {
-    description     = "CapRover clustering TCP"
-    from_port       = 996
-    to_port         = 996
-    protocol        = "tcp"
-    cidr_blocks     = ["0.0.0.0/0"]
+    description = "CapRover clustering TCP"
+    from_port   = 996
+    to_port     = 996
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description     = "CapRover clustering TCP/UDP"
-    from_port       = 7946
-    to_port         = 7946
-    protocol        = "tcp"
-    cidr_blocks     = ["0.0.0.0/0"]
+    description = "CapRover clustering TCP/UDP"
+    from_port   = 7946
+    to_port     = 7946
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description     = "CapRover clustering UDP"
-    from_port       = 7946
-    to_port         = 7946
-    protocol        = "udp"
-    cidr_blocks     = ["0.0.0.0/0"]
+    description = "CapRover clustering UDP"
+    from_port   = 7946
+    to_port     = 7946
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description     = "CapRover overlay UDP"
-    from_port       = 4789
-    to_port         = 4789
-    protocol        = "udp"
-    cidr_blocks     = ["0.0.0.0/0"]
+    description = "CapRover overlay UDP"
+    from_port   = 4789
+    to_port     = 4789
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description     = "Docker swarm TCP"
-    from_port       = 2377
-    to_port         = 2377
-    protocol        = "tcp"
-    cidr_blocks     = ["0.0.0.0/0"]
+    description = "Docker swarm TCP"
+    from_port   = 2377
+    to_port     = 2377
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description     = "Internal VPC traffic"
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    cidr_blocks     = [var.vpc_cidr]
+    description = "Internal VPC traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   egress {
@@ -114,46 +122,46 @@ resource "aws_security_group" "caprover" {
 }
 
 resource "aws_security_group" "gitlab" {
-  name = "${var.env}-gitlab-sg"
+  name        = "${var.env}-gitlab-sg"
   description = "GitLab Security Group"
-  vpc_id = var.vpc_id
+  vpc_id      = var.vpc_id
 
   ingress {
     description = "SSH from allowed IPs"
-    from_port = 22
-    to_port = 22
-    protocol = "tcp"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
     cidr_blocks = var.allowed_ips
   }
 
   ingress {
     description = "HTTP from anywhere"
-    from_port = 80
-    to_port = 80
-    protocol = "tcp"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     description = "HTTPS from anywhere"
-    from_port = 443
-    to_port = 443
-    protocol = "tcp"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     description = "Internal VPC traffic"
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = [var.vpc_cidr]
   }
 
   egress {
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -163,15 +171,15 @@ resource "aws_security_group" "gitlab" {
 }
 
 resource "aws_security_group" "alb" {
-  name = "${var.env}-alb-sg"
+  name        = "${var.env}-alb-sg"
   description = "ALB Security Group"
-  vpc_id = var.vpc_id
+  vpc_id      = var.vpc_id
 
   ingress {
     description = "HTTPS from anywhere"
-    from_port = 443
-    to_port = 443
-    protocol = "tcp"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -185,9 +193,9 @@ resource "aws_security_group" "alb" {
 
   egress {
     description = "Outbound to CapRover"
-    from_port = 80
-    to_port = 80
-    protocol = "tcp"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = [var.vpc_cidr]
   }
 

@@ -21,3 +21,7 @@ output "caprover_dashboard_tg_arn" {
 output "gitlab_http_tg_arn" {
   value = aws_lb_target_group.gitlab_http.arn
 }
+
+output "alb_arn" {
+  value = aws_lb.main.arn
+}

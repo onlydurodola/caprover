@@ -1,3 +1,9 @@
+terraform {
+  backend "s3" {
+
+  }
+}
+
 provider "aws" {
   region = var.aws_region
 }
@@ -7,6 +13,8 @@ module "vpc" {
   vpc_cidr             = var.vpc_cidr
   public_subnet_cidrs  = var.public_subnet_cidrs
   private_subnet_cidrs = var.private_subnet_cidrs
+  aws_region           = var.aws_region
+  internal_sg_id       = module.security_groups.internal_sg_id
   env                  = var.env
 }
 
@@ -27,6 +35,7 @@ module "ec2" {
   source            = "./modules/ec2"
   vpc_id            = module.vpc.vpc_id
   public_subnet_ids = module.vpc.public_subnet_ids
+  depends_on        = [module.vpc, module.security_groups]
   security_groups = [
     module.security_groups.caprover_sg_id,
     module.security_groups.gitlab_sg_id,
@@ -54,4 +63,11 @@ module "route53" {
   alb_zone_id  = module.alb.alb_zone_id
   gitlab_ip    = module.ec2.gitlab_instance_ip
 }
-#
+
+module "waf" {
+  count       = var.waf_enabled ? 1 : 0
+  source      = "./modules/waf"
+  alb_arn     = module.alb.alb_arn
+  allowed_ips = var.allowed_ips
+  env         = var.env
+}

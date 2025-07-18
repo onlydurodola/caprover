@@ -16,3 +16,8 @@ output "caprover_sg_id" {
 output "gitlab_sg_id" {
   value = module.security_groups.gitlab_sg_id
 }
+
+output "waf_web_acl_arn" {
+  value = var.waf_enabled ? module.waf[0].web_acl_arn : null
+}
+
