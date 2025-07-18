@@ -64,6 +64,6 @@
 - name: Clean GitLab logs to free disk space
   command: truncate -s 0 /var/log/gitlab/*.log
 
-- name: Resize filesystem after EBS expansion
-  command: resize2fs /dev/xvda1
-  when: ansible_os_family == "Debian"
+#- name: Resize filesystem after EBS expansion
+# command: resize2fs /dev/xvda1
+#  when: ansible_os_family == "Debian"
