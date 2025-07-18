@@ -55,10 +55,9 @@ jobs:
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl -input=false -reconfigure
       
+      
       - name: Terraform Format Check
-        run: |
-          terraform fmt -recursive -check -diff
-          terraform fmt -check -diff *.tf
+        run: find . -name "*.tf" -exec terraform fmt -check -diff {} +
       
       - name: Terraform Validate
         run: terraform validate
@@ -70,7 +69,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           terraform apply -input=false -auto-approve tfplan
-          rm -f tfplan  # Remove plan file immediately after apply
+          rm -f tfplan
 
       - name: Save Terraform Outputs
         if: github.ref == 'refs/heads/main'
