@@ -15,3 +15,4 @@ ansible/.vault_pass
 .terraform.lock.hcl
 *.log
 ansible/ansible.cfg
+ansible/inventory.ini

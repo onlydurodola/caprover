@@ -1,3 +1,4 @@
+---
 - name: Set Python interpreter
   set_fact:
     ansible_python_interpreter: /usr/bin/python3.8
@@ -11,7 +12,7 @@
       - software-properties-common
       - git
     state: present
-    update_cache: true
+    update_cache: yes
 
 - name: Add Docker's official GPG key
   apt_key:
@@ -30,7 +31,7 @@
       - docker-ce-cli
       - containerd.io
     state: present
-    update_cache: true
+    update_cache: yes
 
 - name: Install Docker Compose
   get_url:
@@ -60,20 +61,12 @@
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
     restart_policy: always
 
-- name: Install Node.js
-  apt:
-    name: nodejs
-    state: present
-
-- name: Install npm
-  apt:
-    name: npm
-    state: present
-
 - name: Install CapRover CLI
   npm:
     name: caprover
-    global: true
+    global: yes
+    executable: /usr/src/app/node_modules/.bin/npm
+    state: present
 
 - name: Configure CapRover dashboard to use subdomain
   command: caprover serversetup --caproverUrl http://captain.{{ domain_name }}:3000
