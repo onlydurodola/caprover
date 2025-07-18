@@ -1,7 +1,7 @@
 - name: Install Docker ans other system requirements
   apt:
     name:
-      - docker.io
+      - docker
       - docker-compose
       - curl
       - git
