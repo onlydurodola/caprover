@@ -6,7 +6,7 @@ output "alb_zone_id" {
   value = aws_lb.main.zone_id
 }
 
-utput "caprover_http_tg_arn" {
+output "caprover_http_tg_arn" {
   value = aws_lb_target_group.caprover_http.arn
 }
 
