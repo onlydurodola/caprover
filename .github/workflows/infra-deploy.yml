@@ -69,23 +69,21 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve tfplan
 
-      # FIXED INDENTATION HERE
       - name: Save Terraform Outputs
         if: github.ref == 'refs/heads/main'
         run: |
           # Get outputs and trim any whitespace
           CAPROVER_IP=$(terraform output -raw caprover_instance_ip | tr -d '\n')
           GITLAB_IP=$(terraform output -raw gitlab_instance_ip | tr -d '\n')
-          
+
           # Set environment variables
           echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
           echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
-          
+
           # Debug outputs
           echo "Debug: CAPROVER_IP: $CAPROVER_IP"
           echo "Debug: GITLAB_IP: $GITLAB_IP"
 
-      # FIXED TO USE ENVIRONMENT VARIABLES DIRECTLY
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
@@ -94,8 +92,7 @@ jobs:
           echo "${{ env.CAPROVER_IP }}" >> inventory.ini
           echo "[gitlab]" >> inventory.ini
           echo "${{ env.GITLAB_IP }}" >> inventory.ini
-          # Debug inventory
-          cat inventory.ini
+          cat inventory.ini # Optional: for debugging
 
       - name: Setup SSH Configuration
         if: github.ref == 'refs/heads/main'
