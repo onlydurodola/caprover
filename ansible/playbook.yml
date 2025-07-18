@@ -1,6 +1,16 @@
 - hosts: caprover
+  vars_files:
+    - vault.yml
   become: true
 
   roles:
     - caprover
+
+- hosts: gitlab
+  vars_files:
+    - vault.yml
+  become: true
+
+  roles:
     - gitlab
+
