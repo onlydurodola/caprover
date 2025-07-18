@@ -40,12 +40,6 @@
     state: started
     enabled: true
 
-- name: Install CapRover
-  shell: |
-    curl -sSL https://caprover.com/caprover.sh | bash
-  args:
-    creates: /usr/local/bin/caprover
-
 - name: Run CapRover container
   docker_container:
     name: caprover
@@ -61,3 +55,18 @@
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
     restart_policy: always
+    
+- name: Install Node.js
+  apt:
+    name: nodejs
+    state: present
+
+- name: Install npm
+  apt:
+    name: npm
+    state: present
+
+- name: Install CapRover CLI
+  npm:
+    name: caprover
+    global: yes
