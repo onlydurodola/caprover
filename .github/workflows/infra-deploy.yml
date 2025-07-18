@@ -73,15 +73,15 @@ jobs:
       - name: Save Terraform Outputs
         if: github.ref == 'refs/heads/main'
         run: |
-          terraform output -raw caprover_instance_ip > caprover_ip.txt
-          terraform output -raw gitlab_instance_ip > gitlab_ip.txt
-          CAPROVER_IP=$(cat caprover_ip.txt | tr -d '\n')
-          GITLAB_IP=$(cat gitlab_ip.txt | tr -d '\n')
+          CAPROVER_IP=$(terraform output -raw caprover_instance_ip | tr -d '\n')
+          GITLAB_IP=$(terraform output -raw gitlab_instance_ip | tr -d '\n')
+          CAPROVER_SG_ID=$(terraform output -raw caprover_sg_id | tr -d '\n')
+          GITLAB_SG_ID=$(terraform output -raw gitlab_sg_id | tr -d '\n')
+          
           echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
           echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
-          echo "Debug: CAPROVER_IP: $CAPROVER_IP"
-          echo "Debug: GITLAB_IP: $GITLAB_IP"
-          rm caprover_ip.txt gitlab_ip.txt
+          echo "CAPROVER_SG_ID=$CAPROVER_SG_ID" >> $GITHUB_ENV
+          echo "GITLAB_SG_ID=$GITLAB_SG_ID" >> $GITHUB_ENV
 
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
@@ -92,6 +92,30 @@ jobs:
           echo "[gitlab]" >> inventory.ini
           echo "${{ env.GITLAB_IP }}" >> inventory.ini
           cat inventory.ini
+      
+      - name: Get Runner IP
+        id: runner_ip
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+          echo "Runner IP: $RUNNER_IP"
+
+      - name: Allow Runner IP in Security Groups
+        run: |
+          # Allow SSH access from runner IP
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ env.CAPROVER_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ env.RUNNER_IP }}/32 \
+            --region eu-north-1
+          
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ env.GITLAB_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ env.RUNNER_IP }}/32 \
+            --region eu-north-1
 
       - name: Setup SSH Configuration
         if: github.ref == 'refs/heads/main'
@@ -115,3 +139,20 @@ jobs:
             --extra-vars "vault_gitlab_root_password='${{ secrets.GITLAB_ROOT_PASSWORD }}'" \
             --vault-password-file .vault_pass
           rm .vault_pass
+      - name: Revoke Runner IP from Security Groups
+        if: always()
+        run: |
+          # Remove temporary access
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ env.CAPROVER_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ env.RUNNER_IP }}/32 \
+            --region eu-north-1 || echo "Revoke failed, but continuing"
+          
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ env.GITLAB_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ env.RUNNER_IP }}/32 \
+            --region eu-north-1 || echo "Revoke failed, but continuing"

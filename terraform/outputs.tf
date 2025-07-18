@@ -9,3 +9,10 @@ output "gitlab_instance_ip" {
 output "alb_dns_name" {
   value = module.alb.alb_dns_name
 }
+output "caprover_sg_id" {
+  value = module.security_groups.caprover_sg_id
+}
+
+output "gitlab_sg_id" {
+  value = module.security_groups.gitlab_sg_id
+}
