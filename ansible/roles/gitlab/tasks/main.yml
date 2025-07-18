@@ -1,3 +1,4 @@
+---
 - name: Update and upgrade system
   apt:
     upgrade: dist
@@ -10,7 +11,30 @@
       - openssh-server
       - ca-certificates
       - postfix
+      - ufw
     state: present
+
+- name: Allow SSH in UFW
+  ufw:
+    rule: allow
+    port: 22
+    proto: tcp
+  when: ansible_os_family == "Debian"
+
+- name: Allow HTTP and HTTPS in UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 80
+    - 443
+  when: ansible_os_family == "Debian"
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: allow
 
 - name: Install GitLab
   shell: |
@@ -22,13 +46,26 @@
 - name: Set external_url in gitlab.rb
   lineinfile:
     path: /etc/gitlab/gitlab.rb
-    line: "external_url 'http://gitlab.oluwatobiloba.tech'"
+    line: "external_url 'http://gitlab.{{ domain_name }}'"
     state: present
     create: true
 
 - name: Configure GitLab
   command: gitlab-ctl reconfigure
+  register: gitlab_reconfigure
+  failed_when: gitlab_reconfigure.rc != 0 and 'timeout' not in gitlab_reconfigure.stderr
 
 - name: Set root password
   command: gitlab-rails runner "user = User.find(1); user.password = '{{ vault_gitlab_root_password }}'; user.password_confirmation = '{{ vault_gitlab_root_password }}'; user.save!"
   no_log: true
+  register: gitlab_password
+  failed_when: gitlab_password.rc != 0 and 'PG::ConnectionBad' not in gitlab_password.stderr
+
+- name: Clean GitLab logs to free disk space
+  command: truncate -s 0 /var/log/gitlab/*.log
+  args:
+    warn: false
+
+- name: Resize filesystem after EBS expansion
+  command: resize2fs /dev/xvda1
+  when: ansible_os_family == "Debian"

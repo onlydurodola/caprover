@@ -17,54 +17,94 @@ resource "aws_security_group" "internal" {
 }
 
 resource "aws_security_group" "caprover" {
-  name = "${var.env}-caprover-sg"
+  name        = "${var.env}-caprover-sg"
   description = "CapRover Security Group"
-  vpc_id = var.vpc_id
+  vpc_id      = var.vpc_id
 
   ingress {
-    description = "SSH from allowed IPs"
-    from_port = 22
-    to_port = 22
-    protocol = "tcp"
-    cidr_blocks = var.allowed_ips
+    description     = "SSH from allowed IPs"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    cidr_blocks     = var.allowed_ips
   }
 
   ingress {
-    description = "HTTP from ALB"
-    from_port = 80
-    to_port = 80
-    protocol = "tcp"
+    description     = "HTTP from ALB"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
 
   ingress {
-    description = "HTTPS from ALB"
-    from_port = 443
-    to_port = 443
-    protocol = "tcp"
+    description     = "HTTPS from ALB"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
 
   ingress {
-    description = "Dashboard from ALB"
-    from_port = 3000
-    to_port = 3000
-    protocol = "tcp"
+    description     = "Dashboard from ALB"
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
 
   ingress {
-    description = "Internal VPC traffic"
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
-    cidr_blocks = [var.vpc_cidr]
+    description     = "CapRover clustering TCP"
+    from_port       = 996
+    to_port         = 996
+    protocol        = "tcp"
+    cidr_blocks     = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description     = "CapRover clustering TCP/UDP"
+    from_port       = 7946
+    to_port         = 7946
+    protocol        = "tcp"
+    cidr_blocks     = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description     = "CapRover clustering UDP"
+    from_port       = 7946
+    to_port         = 7946
+    protocol        = "udp"
+    cidr_blocks     = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description     = "CapRover overlay UDP"
+    from_port       = 4789
+    to_port         = 4789
+    protocol        = "udp"
+    cidr_blocks     = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description     = "Docker swarm TCP"
+    from_port       = 2377
+    to_port         = 2377
+    protocol        = "tcp"
+    cidr_blocks     = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description     = "Internal VPC traffic"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    cidr_blocks     = [var.vpc_cidr]
   }
 
   egress {
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 

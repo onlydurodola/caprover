@@ -41,6 +41,7 @@ module "alb" {
   public_subnet_ids    = module.vpc.public_subnet_ids
   security_group_id    = module.security_groups.alb_sg_id
   caprover_instance_id = module.ec2.caprover_instance_id
+  gitlab_instance_id   = module.ec2.gitlab_instance_id
   certificate_arn      = var.certificate_arn
   env                  = var.env
 }

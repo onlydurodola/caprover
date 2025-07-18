@@ -119,3 +119,39 @@ resource "aws_lb_listener" "dashboard" {
     target_group_arn = aws_lb_target_group.caprover_dashboard.arn
   }
 }
+
+resource "aws_lb_target_group" "gitlab_http" {
+  name     = "gitlab-http-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = var.vpc_id
+  health_check {
+    path                = "/users/sign_in"
+    protocol            = "HTTP"
+    interval            = 30
+    timeout             = 10
+    healthy_threshold   = 2
+    unhealthy_threshold = 5
+    matcher             = "200,302"
+  }
+}
+
+resource "aws_lb_target_group_attachment" "gitlab_http" {
+  target_group_arn = aws_lb_target_group.gitlab_http.arn
+  target_id        = var.gitlab_instance_id
+  port             = 80
+}
+
+resource "aws_lb_listener_rule" "gitlab_http" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 100
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.gitlab_http.arn
+  }
+  condition {
+    host_header {
+      values = ["gitlab.${var.domain_name}"]
+    }
+  }
+}

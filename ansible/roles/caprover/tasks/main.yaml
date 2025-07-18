@@ -11,10 +11,23 @@
       - curl
       - software-properties-common
       - git
+      - ufw
     state: present
     update_cache: yes
 
-- name: Add Docker's official GPG key
+- name: Add Node.js repository
+  shell: |
+    curl -sL https://deb.nodesource.com/setup_18.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: Add Docker’s official GPG key
   apt_key:
     url: https://download.docker.com/linux/ubuntu/gpg
     state: present
@@ -45,6 +58,27 @@
     state: started
     enabled: true
 
+- name: Allow CapRover ports in UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: "{{ proto }}"
+  loop:
+    - { port: 80, proto: tcp }
+    - { port: 443, proto: tcp }
+    - { port: 3000, proto: tcp }
+    - { port: 996, proto: tcp }
+    - { port: 7946, proto: tcp }
+    - { port: 7946, proto: udp }
+    - { port: 4789, proto: udp }
+    - { port: 2377, proto: tcp }
+  when: ansible_os_family == "Debian"
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: allow
+
 - name: Run CapRover container
   docker_container:
     name: caprover
@@ -53,19 +87,25 @@
       - "80:80"
       - "443:443"
       - "3000:3000"
+      - "996:996"
+      - "7946:7946"
+      - "4789:4789"
+      - "2377:2377"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /captain:/captain
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
+      ACCEPTED_TERMS: "true"
+      MAIN_NODE_IP_ADDRESS: "{{ ansible_host }}"
     restart_policy: always
+    state: started
 
 - name: Install CapRover CLI
   npm:
     name: caprover
     global: yes
-    executable: /usr/src/app/node_modules/.bin/npm
     state: present
 
 - name: Configure CapRover dashboard to use subdomain

@@ -24,7 +24,7 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.7
-          terraform_wrapper: false 
+          terraform_wrapper: false
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -35,33 +35,19 @@ jobs:
 
       - name: Setup Terraform Variables
         run: |
-          # Format allowed_ips as proper Terraform list
-          IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed "s/,/\", \"/g")
+          IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed 's/,/\", \"/g')
+          if [ -z "$IPS_STRING" ]; then
+            echo "Error: ALLOWED_IPS is empty or not set"
+            exit 1
+          fi
           echo "allowed_ips = [\"$IPS_STRING\"]" > secrets.auto.tfvars
           echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
           echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
           echo "Generated secrets.auto.tfvars:"
           cat secrets.auto.tfvars
 
-      - name: Add Explicit Backend Block
-        run: |
-          cat <<EOF >> backend.tf
-          terraform {
-            backend "s3" {}
-          }
-          EOF
-          cat backend.tf
-
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl
-
-      - name: Terraform Format Check
-        run: |
-          terraform fmt
-          echo "Format check completed successfully"
-
-      - name: Terraform Validate
-        run: terraform validate
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan
@@ -77,7 +63,6 @@ jobs:
           GITLAB_IP=$(terraform output -raw gitlab_instance_ip | tr -d '\n')
           CAPROVER_SG_ID=$(terraform output -raw caprover_sg_id | tr -d '\n')
           GITLAB_SG_ID=$(terraform output -raw gitlab_sg_id | tr -d '\n')
-          
           echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
           echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
           echo "CAPROVER_SG_ID=$CAPROVER_SG_ID" >> $GITHUB_ENV
@@ -92,7 +77,7 @@ jobs:
           echo "[gitlab]" >> inventory.ini
           echo "${{ env.GITLAB_IP }} ansible_user=ubuntu" >> inventory.ini
           cat inventory.ini
-      
+
       - name: Get Runner IP
         id: runner_ip
         run: |
@@ -102,20 +87,30 @@ jobs:
 
       - name: Allow Runner IP in Security Groups
         run: |
-          # Allow SSH access from runner IP
-          aws ec2 authorize-security-group-ingress \
-            --group-id ${{ env.CAPROVER_SG_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ env.RUNNER_IP }}/32 \
-            --region eu-north-1
-          
-          aws ec2 authorize-security-group-ingress \
-            --group-id ${{ env.GITLAB_SG_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ env.RUNNER_IP }}/32 \
-            --region eu-north-1
+          for PORT in 22 80 443 3000 996 7946 2377; do
+            aws ec2 authorize-security-group-ingress \
+              --group-id ${{ env.CAPROVER_SG_ID }} \
+              --protocol tcp \
+              --port $PORT \
+              --cidr ${{ env.RUNNER_IP }}/32 \
+              --region eu-north-1 || echo "CapRover TCP $PORT rule exists"
+          done
+          for PORT in 7946 4789; do
+            aws ec2 authorize-security-group-ingress \
+              --group-id ${{ env.CAPROVER_SG_ID }} \
+              --protocol udp \
+              --port $PORT \
+              --cidr ${{ env.RUNNER_IP }}/32 \
+              --region eu-north-1 || echo "CapRover UDP $PORT rule exists"
+          done
+          for PORT in 22 80 443; do
+            aws ec2 authorize-security-group-ingress \
+              --group-id ${{ env.GITLAB_SG_ID }} \
+              --protocol tcp \
+              --port $PORT \
+              --cidr ${{ env.RUNNER_IP }}/32 \
+              --region eu-north-1 || echo "GitLab TCP $PORT rule exists"
+          done
 
       - name: Setup SSH Configuration
         if: github.ref == 'refs/heads/main'
@@ -125,7 +120,6 @@ jobs:
           chmod 400 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ env.CAPROVER_IP }} >> ~/.ssh/known_hosts
           ssh-keyscan -H ${{ env.GITLAB_IP }} >> ~/.ssh/known_hosts
-          
 
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
@@ -133,26 +127,36 @@ jobs:
         run: |
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
           chmod 600 .vault_pass
-          ansible-playbook -i inventory.ini playbook.yml \
+          ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file .vault_pass \
-            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }}"
+            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }}" \
+            --limit caprover,gitlab
           rm .vault_pass
 
       - name: Revoke Runner IP from Security Groups
         if: always()
         run: |
-          # Remove temporary access
-          aws ec2 revoke-security-group-ingress \
-            --group-id ${{ env.CAPROVER_SG_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ env.RUNNER_IP }}/32 \
-            --region eu-north-1 || echo "Revoke failed, but continuing"
-          
-          aws ec2 revoke-security-group-ingress \
-            --group-id ${{ env.GITLAB_SG_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ env.RUNNER_IP }}/32 \
-            --region eu-north-1 || echo "Revoke failed, but continuing"
-            
+          for PORT in 22 80 443 3000 996 7946 2377; do
+            aws ec2 revoke-security-group-ingress \
+              --group-id ${{ env.CAPROVER_SG_ID }} \
+              --protocol tcp \
+              --port $PORT \
+              --cidr ${{ env.RUNNER_IP }}/32 \
+              --region eu-north-1 || echo "Revoke CapRover TCP $PORT failed"
+          done
+          for PORT in 7946 4789; do
+            aws ec2 revoke-security-group-ingress \
+              --group-id ${{ env.CAPROVER_SG_ID }} \
+              --protocol udp \
+              --port $PORT \
+              --cidr ${{ env.RUNNER_IP }}/32 \
+              --region eu-north-1 || echo "Revoke CapRover UDP $PORT failed"
+          done
+          for PORT in 22 80 443; do
+            aws ec2 revoke-security-group-ingress \
+              --group-id ${{ env.GITLAB_SG_ID }} \
+              --protocol tcp \
+              --port $PORT \
+              --cidr ${{ env.RUNNER_IP }}/32 \
+              --region eu-north-1 || echo "Revoke GitLab TCP $PORT failed"
+          done
