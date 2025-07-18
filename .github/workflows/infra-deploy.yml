@@ -132,10 +132,10 @@ jobs:
         run: |
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
           chmod 600 .vault_pass
-          ansible-playbook -i inventory.ini playbooks/caprover.yml \
+          ansible-playbook -i inventory.ini playbook.yml \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }}" \
             --vault-password-file .vault_pass
-          ansible-playbook -i inventory.ini playbooks/gitlab.yml \
+          ansible-playbook -i inventory.ini playbook.yml \
             --extra-vars "vault_gitlab_root_password='${{ secrets.GITLAB_ROOT_PASSWORD }}'" \
             --vault-password-file .vault_pass
           rm .vault_pass
