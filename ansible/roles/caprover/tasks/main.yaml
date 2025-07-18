@@ -1,3 +1,4 @@
+# ansible/roles/caprover/tasks/main.yaml
 ---
 - name: Set Python interpreter
   set_fact:
@@ -94,14 +95,12 @@
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /captain:/captain
-    network_mode: host
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
       ACCEPTED_TERMS: "true"
       MAIN_NODE_IP_ADDRESS: "{{ ansible_host }}"
-      BY_PASS_PROXY_CHECK: 'TRUE' 
-      CAPROVER_MACHINE_HOST: "{{ ansible_host }}"
+      BY_PASS_PROXY_CHECK: 'TRUE'
     restart_policy: always
     state: started
 
@@ -112,6 +111,6 @@
     state: present
 
 - name: Configure CapRover dashboard to use subdomain
-  command: caprover serversetup --caproverUrl http://captain.{{ domain_name }}:3000
+  command: caprover serversetup --caproverUrl http://captain.{{ domain_name }}
   args:
     creates: /captain/data/config-captain.json

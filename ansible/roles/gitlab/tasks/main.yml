@@ -1,4 +1,3 @@
----
 - name: Update and upgrade system
   apt:
     upgrade: dist
@@ -50,14 +49,28 @@
     state: present
     create: true
 
-- name: Configure HTTPS for GitLab
+- name: Disable GitLab Let's Encrypt
+  lineinfile:
+    path: /etc/gitlab/gitlab.rb
+    line: "letsencrypt['enable'] = false"
+    state: present
+
+- name: Configure SSL termination at proxy
   blockinfile:
     path: /etc/gitlab/gitlab.rb
     block: |
-      nginx['redirect_http_to_https'] = true
-      nginx['ssl_certificate'] = "/etc/gitlab/ssl/{{ domain_name }}.crt"
-      nginx['ssl_certificate_key'] = "/etc/gitlab/ssl/{{ domain_name }}.key"
-    marker: "# {mark} ANSIBLE MANAGED BLOCK - GITLAB SSL"
+      nginx['listen_port'] = 80
+      nginx['listen_https'] = false
+      nginx['proxy_protocol'] = true
+      nginx['real_ip_trusted_addresses'] = ['{{ vpc_cidr }}']  # VPC CIDR
+      nginx['real_ip_header'] = 'proxy_protocol'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - PROXY SETTINGS"
+
+- name: Configure trusted proxies
+  lineinfile:
+    path: /etc/gitlab/gitlab.rb
+    line: "gitlab_rails['trusted_proxies'] = ['{{ vpc_cidr }}']"
+    state: present
 
 - name: Configure GitLab
   command: gitlab-ctl reconfigure
@@ -72,7 +85,3 @@
 
 - name: Clean GitLab logs to free disk space
   command: truncate -s 0 /var/log/gitlab/*.log
-
-#- name: Resize filesystem after EBS expansion
-# command: resize2fs /dev/xvda1
-#  when: ansible_os_family == "Debian"

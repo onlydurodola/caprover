@@ -1,3 +1,4 @@
+# terraform/modules/alb/main.tf
 resource "aws_lb" "main" {
   name               = "shortlink-alb"
   internal           = false
@@ -59,17 +60,21 @@ resource "aws_lb_target_group" "caprover_dashboard" {
 }
 
 resource "aws_lb_target_group" "gitlab_http" {
-  name     = "gitlab-http-tg"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  name        = "gitlab-http-tg"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "instance"
+
+  # Enable proxy protocol for real IP detection
+  proxy_protocol_v2 = true
 
   health_check {
     path                = "/explore"
     interval            = 30
-    timeout             = 10
+    timeout             = 5
     healthy_threshold   = 2
-    unhealthy_threshold = 5
+    unhealthy_threshold = 2
     matcher             = "200,302"
   }
 }
@@ -113,11 +118,6 @@ resource "aws_lb_listener" "http" {
       message_body = "Route not found. Please check the URL."
     }
   }
-
-  # Add explicit deny for invalid paths
-  lifecycle {
-    ignore_changes = [default_action[0].order]
-  }
 }
 
 resource "aws_lb_listener" "https" {
@@ -125,7 +125,7 @@ resource "aws_lb_listener" "https" {
   port              = 443
   protocol          = "HTTPS"
   certificate_arn   = var.certificate_arn
-  ssl_policy        = "ELBSecurityPolicy-2016-08"  # Updated SSL policy
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
 
   default_action {
     type             = "forward"
@@ -163,7 +163,7 @@ resource "aws_lb_listener_rule" "gitlab_http" {
 
 resource "aws_lb_listener_rule" "gitlab_https" {
   listener_arn = aws_lb_listener.https.arn
-  priority     = 150  # Between existing rules
+  priority     = 150  # Between other rules
 
   action {
     type             = "forward"
