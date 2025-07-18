@@ -1,4 +1,6 @@
 - hosts: caprover
-  become: yes
+  become: true
+
   roles:
     - caprover
+    - gitlab
