@@ -56,8 +56,10 @@ jobs:
         run: terraform init -backend-config=backend.hcl -input=false -reconfigure
       
       - name: Terraform Format Check
-        run: terraform fmt -recursive -check -diff
-
+        run: |
+          terraform fmt -recursive -check -diff
+          terraform fmt -check -diff *.tf
+      
       - name: Terraform Validate
         run: terraform validate
 

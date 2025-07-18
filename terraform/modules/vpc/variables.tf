@@ -12,3 +12,4 @@ variable "internal_sg_id" {
   description = "Security group ID for internal VPC traffic"
   type        = string
 }
+#
