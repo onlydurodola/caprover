@@ -83,6 +83,11 @@ jobs:
           echo "GITLAB_IP<<EOF" >> $GITHUB_ENV
           cat ../ansible/gitlab_ip >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
+          # Debug: Print file contents to verify
+          echo "Debug: caprover_ip contents:"
+          cat ../ansible/caprover_ip
+          echo "Debug: gitlab_ip contents:"
+          cat ../ansible/gitlab_ip
 
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
