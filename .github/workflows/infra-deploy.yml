@@ -53,9 +53,11 @@ jobs:
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl -input=false -reconfigure
       
-      - name: Terraform Format Check
-        run: find . -name "*.tf" -exec terraform fmt -check -diff {} +
-      
+      - name: Terraform Format
+        run: |
+          terraform fmt -recursive
+          find . -name "*.tf" -exec terraform fmt -check -diff {} +
+            
       - name: Terraform Validate
         run: terraform validate
 
