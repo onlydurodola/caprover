@@ -43,6 +43,7 @@ module "alb" {
   caprover_instance_id = module.ec2.caprover_instance_id
   gitlab_instance_id   = module.ec2.gitlab_instance_id
   certificate_arn      = var.certificate_arn
+  domain_name          = var.domain_name
   env                  = var.env
 }
 
