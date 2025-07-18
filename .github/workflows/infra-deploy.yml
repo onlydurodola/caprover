@@ -39,7 +39,6 @@ jobs:
           echo "allowed_ips = [\"$IPS_STRING\"]" > secrets.auto.tfvars
           echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
           echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
-          # Debug: show generated file
           echo "Generated secrets.auto.tfvars:"
           cat secrets.auto.tfvars
 
@@ -70,38 +69,33 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve tfplan
 
+      # FIXED INDENTATION HERE
       - name: Save Terraform Outputs
         if: github.ref == 'refs/heads/main'
         run: |
-          # Get outputs, clean any debug text, and trim whitespace
-          terraform output -raw caprover_instance_ip | sed 's/::debug::.*//' | tr -d '\n' > ../ansible/caprover_ip
-          terraform output -raw gitlab_instance_ip | sed 's/::debug::.*//' | tr -d '\n' > ../ansible/gitlab_ip
+          # Get outputs and trim any whitespace
+          CAPROVER_IP=$(terraform output -raw caprover_instance_ip | tr -d '\n')
+          GITLAB_IP=$(terraform output -raw gitlab_instance_ip | tr -d '\n')
+          
           # Set environment variables
-          echo "CAPROVER_IP=$(cat ../ansible/caprover_ip)" >> $GITHUB_ENV
-          echo "GITLAB_IP=$(cat ../ansible/gitlab_ip)" >> $GITHUB_ENV
+          echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
+          echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
+          
           # Debug outputs
-          echo "Debug: caprover_ip contents (hex dump):"
-          hexdump -C ../ansible/caprover_ip
-          echo "Debug: gitlab_ip contents (hex dump):"
-          hexdump -C ../ansible/gitlab_ip
-          echo "Debug: CAPROVER_IP env var (in next step): $CAPROVER_IP"
-          echo "Debug: GITLAB_IP env var (in next step): $GITLAB_IP"
-
-      - name: Debug Environment Variables
-        if: github.ref == 'refs/heads/main'
-        run: |
           echo "Debug: CAPROVER_IP: $CAPROVER_IP"
           echo "Debug: GITLAB_IP: $GITLAB_IP"
 
+      # FIXED TO USE ENVIRONMENT VARIABLES DIRECTLY
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
           echo "[caprover]" > inventory.ini
-          echo "$(cat caprover_ip)" >> inventory.ini
+          echo "${{ env.CAPROVER_IP }}" >> inventory.ini
           echo "[gitlab]" >> inventory.ini
-          echo "$(cat gitlab_ip)" >> inventory.ini
-          rm caprover_ip gitlab_ip
+          echo "${{ env.GITLAB_IP }}" >> inventory.ini
+          # Debug inventory
+          cat inventory.ini
 
       - name: Setup SSH Configuration
         if: github.ref == 'refs/heads/main'
@@ -109,8 +103,8 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 400 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ env.CAPROVER_IP }}" >> ~/.ssh/known_hosts
-          ssh-keyscan -H "${{ env.GITLAB_IP }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.CAPROVER_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.GITLAB_IP }} >> ~/.ssh/known_hosts
 
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
@@ -122,6 +116,6 @@ jobs:
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }}" \
             --vault-password-file .vault_pass
           ansible-playbook -i inventory.ini playbooks/gitlab.yml \
-            --extra-vars "vault_gitlab_root_password=${{ secrets.GITLAB_ROOT_PASSWORD }}" \
+            --extra-vars "vault_gitlab_root_password='${{ secrets.GITLAB_ROOT_PASSWORD }}'" \
             --vault-password-file .vault_pass
           rm .vault_pass
