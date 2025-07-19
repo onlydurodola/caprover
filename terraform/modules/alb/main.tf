@@ -49,7 +49,7 @@ resource "aws_lb_target_group" "caprover_dashboard" {
   vpc_id   = var.vpc_id
 
   health_check {
-    path                = "/app/captain/"
+    path                = "/"
     interval            = 30
     timeout             = 5
     healthy_threshold   = 2
@@ -60,14 +60,14 @@ resource "aws_lb_target_group" "caprover_dashboard" {
 
 resource "aws_lb_target_group" "gitlab_http" {
   name        = "gitlab-tcp-tg-${var.env}"
-  port        = 80
+  port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "instance"
 
 
   health_check {
-    path                = "/explore"
+    path                = "/users/sign_in"
     port                = "traffic-port"
     interval            = 30
     timeout             = 5
@@ -103,7 +103,7 @@ resource "aws_lb_target_group_attachment" "caprover_dashboard" {
 resource "aws_lb_target_group_attachment" "gitlab_http" {
   target_group_arn = aws_lb_target_group.gitlab_http.arn
   target_id        = var.gitlab_instance_id
-  port             = 80
+  port             = 8080
 }
 
 # Listeners

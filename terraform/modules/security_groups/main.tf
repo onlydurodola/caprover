@@ -38,6 +38,14 @@ resource "aws_security_group" "caprover" {
   }
 
   ingress {
+    description     = "Allow from ALB"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
     description     = "HTTP from ALB"
     from_port       = 80
     to_port         = 80
@@ -132,6 +140,14 @@ resource "aws_security_group" "gitlab" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = var.allowed_ips
+  }
+  
+  ingress {
+    description     = "Allow from ALB"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    security_groups = [aws_security_group.alb.id]
   }
 
   ingress {

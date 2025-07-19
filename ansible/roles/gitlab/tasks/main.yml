@@ -59,7 +59,7 @@
   blockinfile:
     path: /etc/gitlab/gitlab.rb
     block: |
-      nginx['listen_port'] = 80
+      nginx['listen_port'] = 8080
       nginx['listen_https'] = false
       nginx['proxy_protocol'] = true
       nginx['real_ip_trusted_addresses'] = ['{{ vpc_cidr }}']
@@ -77,6 +77,13 @@
   no_log: true
   register: gitlab_password
   failed_when: gitlab_password.rc != 0 and 'PG::ConnectionBad' not in gitlab_password.stderr
+
+- name: Ensure GitLab is fully ready
+  shell: gitlab-ctl status | grep "run:"
+  register: status
+  until: "'run: postgresql' in status.stdout and 'run: nginx' in status.stdout"
+  retries: 12
+  delay: 30
 
 - name: Clean GitLab logs to free disk space
   command: truncate -s 0 /var/log/gitlab/*.log

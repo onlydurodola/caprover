@@ -114,3 +114,16 @@
   command: caprover serversetup --caproverUrl http://captain.{{ domain_name }}
   args:
     creates: /captain/data/config-captain.json
+
+- name: Verify CapRover installation
+  shell: |
+    curl -sI http://localhost:3000 | grep "200 OK"
+  register: result
+  until: result.rc == 0
+  retries: 10
+  delay: 30
+
+- name: Allow VPC CIDR in UFW
+  ufw:
+    rule: allow
+    src: "{{ vpc_cidr }}" 
