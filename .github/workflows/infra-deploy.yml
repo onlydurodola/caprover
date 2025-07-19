@@ -1,11 +1,12 @@
 name: Deploy Infrastructure
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'terraform/**'
-      - 'ansible/**'
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'terraform/**'
+  #     - 'ansible/**'
+  workflow_dispatch:
 
 jobs:
   deploy:

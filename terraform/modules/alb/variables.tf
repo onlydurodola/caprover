@@ -8,3 +8,4 @@ variable "domain_name" {}
 variable "env" {
   default = "prod"
 }
+
