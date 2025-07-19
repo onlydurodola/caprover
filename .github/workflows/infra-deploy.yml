@@ -22,12 +22,6 @@ jobs:
         with:
           clean: true
 
-      - name: Clean workspace
-        run: |
-          find . -name '*.tfstate*' -delete
-          rm -rf .terraform
-          rm -f secrets.auto.tfvars tfplan
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
@@ -79,12 +73,14 @@ jobs:
           CAPROVER_SG_ID=$(terraform output -raw caprover_sg_id)
           GITLAB_SG_ID=$(terraform output -raw gitlab_sg_id)
           ALB_DNS=$(terraform output -raw alb_dns_name)
+          VPC_CIDR=$(terraform output -raw vpc_cidr)
           
           echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
           echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
           echo "CAPROVER_SG_ID=$CAPROVER_SG_ID" >> $GITHUB_ENV
           echo "GITLAB_SG_ID=$GITLAB_SG_ID" >> $GITHUB_ENV
           echo "ALB_DNS=$ALB_DNS" >> $GITHUB_ENV
+          echo "VPC_CIDR" >> $GITHUB_ENV
 
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
@@ -149,12 +145,13 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          VPC_CIDR=$(cd ../terraform && terraform output -raw vpc_cidr)
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
           chmod 600 .vault_pass
+
           ansible-playbook -i inventory.ini playbook.yml -vv \
             --vault-password-file .vault_pass \
-            --extra-vars "vpc_cidr=$VPC_CIDR domain_name=${{ secrets.DOMAIN_NAME }} vault_gitlab_root_password=${{ secrets.GITLAB_ROOT_PASSWORD }}"
+            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
+
           shred -zu .vault_pass
 
       - name: Verify CapRover Setup

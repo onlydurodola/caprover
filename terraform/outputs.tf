@@ -22,5 +22,5 @@ output "waf_web_acl_arn" {
 }
 
 output "vpc_cidr" {
-  value = var.vpc_cidr
+  value = module.vpc.vpc_cidr
 }
