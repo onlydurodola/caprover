@@ -12,7 +12,6 @@ ansible/.vault_pass
 
 # Local files
 .terraform/
-.terraform.lock.hcl
 *.log
 ansible/ansible.cfg
 ansible/inventory.ini
