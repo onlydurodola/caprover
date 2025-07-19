@@ -1,6 +1,6 @@
 - name: Set Python interpreter
   set_fact:
-    ansible_python_interpreter: /usr/bin/python3.12
+    ansible_python_interpreter: /usr/bin/python3.8
 
 - name: Check if CapRover is already installed
   stat:
