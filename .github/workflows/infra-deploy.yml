@@ -149,16 +149,12 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          # Securely handle vault password
+          VPC_CIDR=$(cd ../terraform && terraform output -raw vpc_cidr)
           echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
           chmod 600 .vault_pass
-          
-          # Run playbook with debugging
           ansible-playbook -i inventory.ini playbook.yml -vv \
             --vault-password-file .vault_pass \
-            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }}"
-          
-          # Cleanup sensitive file
+            --extra-vars "vpc_cidr=$VPC_CIDR domain_name=${{ secrets.DOMAIN_NAME }} vault_gitlab_root_password=${{ secrets.GITLAB_ROOT_PASSWORD }}"
           shred -zu .vault_pass
 
       - name: Verify CapRover Setup

@@ -21,3 +21,6 @@ output "waf_web_acl_arn" {
   value = var.waf_enabled ? module.waf[0].web_acl_arn : null
 }
 
+output "vpc_cidr" {
+  value = var.vpc_cidr
+}
