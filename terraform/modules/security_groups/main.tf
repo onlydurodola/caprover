@@ -135,7 +135,7 @@ resource "aws_security_group" "gitlab" {
   }
 
   ingress {
-    description     = "TCP from ALB"
+    description     = "HTTP from ALB"
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"

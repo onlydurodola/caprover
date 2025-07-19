@@ -58,16 +58,15 @@ resource "aws_lb_target_group" "caprover_dashboard" {
   }
 }
 
-resource "aws_lb_target_group" "gitlab_tcp" {
+resource "aws_lb_target_group" "gitlab_http" {
   name        = "gitlab-tcp-tg-${var.env}"
   port        = 80
-  protocol    = "TCP"
+  protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "instance"
-  proxy_protocol_v2 = true
+
 
   health_check {
-    protocol            = "HTTP"
     path                = "/explore"
     port                = "traffic-port"
     interval            = 30
@@ -101,8 +100,8 @@ resource "aws_lb_target_group_attachment" "caprover_dashboard" {
   port             = 3000
 }
 
-resource "aws_lb_target_group_attachment" "gitlab_tcp" {
-  target_group_arn = aws_lb_target_group.gitlab_tcp.arn
+resource "aws_lb_target_group_attachment" "gitlab_http" {
+  target_group_arn = aws_lb_target_group.gitlab_http.arn
   target_id        = var.gitlab_instance_id
   port             = 80
 }
@@ -154,7 +153,7 @@ resource "aws_lb_listener_rule" "gitlab_http" {
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.gitlab_tcp.arn
+    target_group_arn = aws_lb_target_group.gitlab_http.arn
   }
 
   condition {
@@ -170,7 +169,7 @@ resource "aws_lb_listener_rule" "gitlab_https" {
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.gitlab_tcp.arn
+    target_group_arn = aws_lb_target_group.gitlab_http.arn
   }
 
   condition {
