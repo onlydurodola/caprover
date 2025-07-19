@@ -80,8 +80,7 @@ jobs:
           echo "CAPROVER_SG_ID=$CAPROVER_SG_ID" >> $GITHUB_ENV
           echo "GITLAB_SG_ID=$GITLAB_SG_ID" >> $GITHUB_ENV
           echo "ALB_DNS=$ALB_DNS" >> $GITHUB_ENV
-          echo "VPC_CIDR" >> $GITHUB_ENV
-
+          echo "VPC_CIDR=$VPC_CIDR" >> $GITHUB_ENV 
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
