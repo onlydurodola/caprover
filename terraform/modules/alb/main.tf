@@ -24,9 +24,6 @@ resource "aws_lb_target_group" "caprover_http" {
     unhealthy_threshold = 2
     matcher             = "200-399"
   }
-  
-  depends_on = [aws_lb_listener_rule.caprover_dashboard]
-
 }
 
 resource "aws_lb_target_group" "caprover_https" {
@@ -43,9 +40,6 @@ resource "aws_lb_target_group" "caprover_https" {
     unhealthy_threshold = 2
     matcher             = "200-399"
   }
-  
-  depends_on = [aws_lb_listener_rule.caprover_dashboard]
-
 }
 
 resource "aws_lb_target_group" "caprover_dashboard" {
@@ -62,8 +56,6 @@ resource "aws_lb_target_group" "caprover_dashboard" {
     unhealthy_threshold = 2
     matcher             = "200-399"
   }
-
-  depends_on = [aws_lb_listener_rule.caprover_dashboard]
 }
 
 resource "aws_lb_target_group" "gitlab_http" {
@@ -72,7 +64,6 @@ resource "aws_lb_target_group" "gitlab_http" {
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "instance"
-
 
   health_check {
     path                = "/users/sign_in"
@@ -87,12 +78,6 @@ resource "aws_lb_target_group" "gitlab_http" {
   lifecycle {
     create_before_destroy = true
   }
-
-  # Explicitly depend on listener rules
-  depends_on = [
-    aws_lb_listener_rule.gitlab_http,
-    aws_lb_listener_rule.gitlab_https
-  ]
 
   tags = {
     Name = "${var.env}-gitlab-tcp-tg"
