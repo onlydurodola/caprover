@@ -59,7 +59,7 @@ resource "aws_lb_target_group" "caprover_dashboard" {
 }
 
 resource "aws_lb_target_group" "gitlab_http" {
-  name        = "gitlab-tcp-tg-${var.env}"
+  name_prefix = "gitlab-tg-${var.env}-"  # Critical change
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
@@ -76,7 +76,7 @@ resource "aws_lb_target_group" "gitlab_http" {
   }
 
   lifecycle {
-    create_before_destroy = true
+    create_before_destroy = true 
   }
 
   tags = {
