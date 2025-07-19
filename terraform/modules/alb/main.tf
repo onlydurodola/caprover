@@ -59,7 +59,7 @@ resource "aws_lb_target_group" "caprover_dashboard" {
 }
 
 resource "aws_lb_target_group" "gitlab_http" {
-  name_prefix = "gitlab-tg-${var.env}-"  # Critical change
+  name        = "gitlab-${var.env}-tg"
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
