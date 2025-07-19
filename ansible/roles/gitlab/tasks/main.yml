@@ -93,6 +93,3 @@
     state: absent
   with_items: "{{ old_logs.files }}"
   when: old_logs.matched > 0 and ansible_check_mode == false
-
-- name: Create handlers for GitLab
-  meta: end_play

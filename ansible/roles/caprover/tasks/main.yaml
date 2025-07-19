@@ -1,6 +1,6 @@
 - name: Set Python interpreter
   set_fact:
-    ansible_python_interpreter: /usr/bin/python3.8
+    ansible_python_interpreter: /usr/bin/python3.12
 
 - name: Check if CapRover is already installed
   stat:
@@ -17,7 +17,7 @@
       - git
       - ufw
     state: present
-    update_cache: true
+    update_cache: yes
   when: not caprover_installed.stat.exists
 
 - name: Add Node.js repository (if needed)
@@ -31,7 +31,7 @@
   apt:
     name: nodejs
     state: present
-    update_cache: true
+    update_cache: yes
   when: not caprover_installed.stat.exists
 
 - name: Add Docker repository (if needed)
@@ -47,7 +47,7 @@
       - docker-ce-cli
       - containerd.io
     state: present
-    update_cache: true
+    update_cache: yes
   when: not caprover_installed.stat.exists
   notify: restart docker
 
@@ -78,7 +78,7 @@
     - { port: 7946, proto: udp }
     - { port: 4789, proto: udp }
     - { port: 2377, proto: tcp }
-    - { port: 22, proto: tcp }   
+    - { port: 22, proto: tcp }
   when: ansible_os_family == "Debian"
   notify: reload ufw
 
@@ -116,7 +116,7 @@
 - name: Install CapRover CLI (if needed)
   npm:
     name: caprover
-    global: true
+    global: yes
     state: present
   when: not caprover_installed.stat.exists
 
@@ -140,7 +140,4 @@
   ufw:
     rule: allow
     src: "{{ vpc_cidr }}"
-  changed_when: false  
-
-- name: Create handlers for services
-  meta: end_play
+  changed_when: false

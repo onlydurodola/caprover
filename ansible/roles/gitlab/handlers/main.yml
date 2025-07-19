@@ -1,0 +1,9 @@
+- name: reload ufw
+  command: ufw reload
+  async: 10
+  poll: 0
+
+- name: reconfigure gitlab
+  command: gitlab-ctl reconfigure
+  async: 600
+  poll: 0
