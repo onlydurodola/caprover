@@ -2,7 +2,8 @@
   vars_files:
     - vault.yml
   become: true
-
+  handlers:
+    - include: handlers/main.yml
   roles:
     - caprover
 
@@ -10,7 +11,7 @@
   vars_files:
     - vault.yml
   become: true
-
+  handlers:
+    - include: handlers/main.yml
   roles:
     - gitlab
-

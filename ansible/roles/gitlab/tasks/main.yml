@@ -1,9 +1,15 @@
-- name: Update and upgrade system
+- name: Check if GitLab is installed
+  stat:
+    path: /usr/bin/gitlab-ctl
+  register: gitlab_installed
+
+- name: Update system (if not installed)
   apt:
     upgrade: dist
     update_cache: true
+  when: not gitlab_installed.stat.exists
 
-- name: Install prerequisites
+- name: Install prerequisites (if needed)
   apt:
     name:
       - curl
@@ -12,78 +18,81 @@
       - postfix
       - ufw
     state: present
+  when: not gitlab_installed.stat.exists
 
-- name: Allow SSH in UFW
-  ufw:
-    rule: allow
-    port: 22
-    proto: tcp
-  when: ansible_os_family == "Debian"
-
-- name: Allow HTTP and HTTPS in UFW
+- name: Configure UFW (idempotent)
   ufw:
     rule: allow
     port: "{{ item }}"
     proto: tcp
   loop:
+    - 22
     - 80
     - 443
   when: ansible_os_family == "Debian"
+  notify: reload ufw
 
-- name: Enable UFW
+- name: Enable UFW (if not enabled)
   ufw:
     state: enabled
     policy: allow
+  when: ansible_facts.ufw.status == "disabled"
 
-- name: Install GitLab
+- name: Install GitLab (if not installed)
   shell: |
     curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
     apt-get install -y gitlab-ce
   args:
     creates: /usr/bin/gitlab-ctl
+  when: not gitlab_installed.stat.exists
 
-- name: Set external_url in gitlab.rb
-  lineinfile:
-    path: /etc/gitlab/gitlab.rb
-    line: "external_url 'https://gitlab.{{ domain_name }}'"
-    state: present
-    create: true
-
-- name: Disable GitLab Let's Encrypt
-  lineinfile:
-    path: /etc/gitlab/gitlab.rb
-    line: "letsencrypt['enable'] = false"
-    state: present
-
-- name: Configure SSL termination at proxy
+- name: Configure GitLab settings (idempotent)
   blockinfile:
     path: /etc/gitlab/gitlab.rb
     block: |
+      external_url 'https://gitlab.{{ domain_name }}'
       nginx['listen_port'] = 8080
       nginx['listen_https'] = false
       nginx['proxy_protocol'] = true
       nginx['real_ip_trusted_addresses'] = ['{{ vpc_cidr }}']
       nginx['real_ip_header'] = 'X-Forwarded-For'
       gitlab_rails['trusted_proxies'] = ['{{ vpc_cidr }}']
+      letsencrypt['enable'] = false
     marker: "# {mark} ANSIBLE MANAGED BLOCK - PROXY SETTINGS"
+  notify: reconfigure gitlab
 
-- name: Configure GitLab
-  command: gitlab-ctl reconfigure
-  register: gitlab_reconfigure
-  failed_when: gitlab_reconfigure.rc != 0 and 'timeout' not in gitlab_reconfigure.stderr
+- name: Check if root password is set
+  shell: |
+    gitlab-rails runner "exit User.find(1).encrypted_password.blank? ? 1 : 0"
+  register: password_check
+  ignore_errors: true
+  changed_when: false
 
-- name: Set root password
+- name: Set root password (only if not set)
   command: gitlab-rails runner "user = User.find(1); user.password = '{{ vault_gitlab_root_password }}'; user.password_confirmation = '{{ vault_gitlab_root_password }}'; user.save!"
   no_log: true
-  register: gitlab_password
-  failed_when: gitlab_password.rc != 0 and 'PG::ConnectionBad' not in gitlab_password.stderr
+  when: password_check.rc != 0
+  notify: reconfigure gitlab
 
-- name: Ensure GitLab is fully ready
-  shell: gitlab-ctl status | grep "run:"
-  register: status
-  until: "'run: postgresql' in status.stdout and 'run: nginx' in status.stdout"
-  retries: 12
-  delay: 30
+- name: Ensure GitLab services are running
+  shell: gitlab-ctl status
+  register: gitlab_status
+  changed_when: "'run:' not in gitlab_status.stdout"
+  failed_when: "'down:' in gitlab_status.stdout"
 
-- name: Clean GitLab logs to free disk space
-  command: truncate -s 0 /var/log/gitlab/*.log
+- name: Rotate logs instead of truncating
+  find:
+    paths: /var/log/gitlab
+    patterns: "*.log"
+    age: "7d"
+  register: old_logs
+
+- name: Remove old logs
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  with_items: "{{ old_logs.files }}"
+  when: old_logs.matched > 0 and ansible_check_mode == false
+
+- name: Create handlers for GitLab
+  meta: end_play

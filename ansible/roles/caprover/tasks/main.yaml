@@ -1,10 +1,13 @@
-# ansible/roles/caprover/tasks/main.yaml
----
 - name: Set Python interpreter
   set_fact:
     ansible_python_interpreter: /usr/bin/python3.8
 
-- name: Install prerequisites
+- name: Check if CapRover is already installed
+  stat:
+    path: /captain/data/config-captain.json
+  register: caprover_installed
+
+- name: Install prerequisites (if not installed)
   apt:
     name:
       - apt-transport-https
@@ -14,52 +17,54 @@
       - git
       - ufw
     state: present
-    update_cache: yes
+    update_cache: true
+  when: not caprover_installed.stat.exists
 
-- name: Add Node.js repository
+- name: Add Node.js repository (if needed)
   shell: |
     curl -sL https://deb.nodesource.com/setup_18.x | bash -
   args:
     creates: /etc/apt/sources.list.d/nodesource.list
+  when: not caprover_installed.stat.exists
 
-- name: Install Node.js
+- name: Install Node.js (if needed)
   apt:
     name: nodejs
     state: present
-    update_cache: yes
+    update_cache: true
+  when: not caprover_installed.stat.exists
 
-- name: Add Docker’s official GPG key
-  apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
-
-- name: Add Docker repository
+- name: Add Docker repository (if needed)
   apt_repository:
     repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
     state: present
+  when: not caprover_installed.stat.exists
 
-- name: Install Docker
+- name: Install Docker components (if needed)
   apt:
     name:
       - docker-ce
       - docker-ce-cli
       - containerd.io
     state: present
-    update_cache: yes
+    update_cache: true
+  when: not caprover_installed.stat.exists
+  notify: restart docker
 
-- name: Install Docker Compose
+- name: Install Docker Compose (if needed)
   get_url:
     url: https://github.com/docker/compose/releases/download/1.29.2/docker-compose-Linux-x86_64
     dest: /usr/local/bin/docker-compose
     mode: '0755'
+  when: not caprover_installed.stat.exists
 
-- name: Ensure Docker is started
+- name: Ensure Docker is running
   systemd:
     name: docker
     state: started
     enabled: true
 
-- name: Allow CapRover ports in UFW
+- name: Configure UFW ports (idempotent)
   ufw:
     rule: allow
     port: "{{ item.port }}"
@@ -73,14 +78,17 @@
     - { port: 7946, proto: udp }
     - { port: 4789, proto: udp }
     - { port: 2377, proto: tcp }
+    - { port: 22, proto: tcp }   
   when: ansible_os_family == "Debian"
+  notify: reload ufw
 
-- name: Enable UFW
+- name: Enable UFW (if not enabled)
   ufw:
     state: enabled
     policy: allow
+  when: ansible_facts.ufw.status == "disabled"
 
-- name: Run CapRover container
+- name: Run CapRover container (if not running)
   docker_container:
     name: caprover
     image: caprover/caprover
@@ -103,27 +111,36 @@
       BY_PASS_PROXY_CHECK: 'TRUE'
     restart_policy: always
     state: started
+  when: not caprover_installed.stat.exists
 
-- name: Install CapRover CLI
+- name: Install CapRover CLI (if needed)
   npm:
     name: caprover
-    global: yes
+    global: true
     state: present
+  when: not caprover_installed.stat.exists
 
-- name: Configure CapRover dashboard to use subdomain
+- name: Configure CapRover dashboard (first run only)
   command: caprover serversetup --caproverUrl http://captain.{{ domain_name }}
   args:
     creates: /captain/data/config-captain.json
+  when: not caprover_installed.stat.exists
 
-- name: Verify CapRover installation
-  shell: |
-    curl -sI http://localhost:3000 | grep "200 OK"
-  register: result
-  until: result.rc == 0
+- name: Verify CapRover health
+  uri:
+    url: http://localhost:3000
+    status_code: 200
+    timeout: 10
+  register: health_check
+  until: health_check.status == 200
   retries: 10
-  delay: 30
+  delay: 15
 
-- name: Allow VPC CIDR in UFW
+- name: Allow VPC CIDR in UFW (idempotent)
   ufw:
     rule: allow
-    src: "{{ vpc_cidr }}" 
+    src: "{{ vpc_cidr }}"
+  changed_when: false  
+
+- name: Create handlers for services
+  meta: end_play
