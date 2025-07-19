@@ -52,4 +52,9 @@ jobs:
 
       - name: Terraform Destroy
         if: github.ref == 'refs/heads/main'
-        run: terraform destroy -auto-approve
+        run: |
+          terraform destroy -target module.alb.aws_lb_listener_rule \
+          -target module.alb.aws_lb_listener \
+          -auto-approve
+          sleep 30  # Wait for rules to detach
+          terraform destroy -auto-approve
