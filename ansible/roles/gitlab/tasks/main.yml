@@ -66,6 +66,8 @@
     marker: "# {mark} ANSIBLE MANAGED BLOCK - PROXY SETTINGS"
   notify: reconfigure gitlab
 
+  
+
 - name: Check if root password is set
   shell: |
     gitlab-rails runner "exit User.find(1).encrypted_password.blank? ? 1 : 0"
@@ -73,11 +75,41 @@
   ignore_errors: true
   changed_when: false
 
+- name: Wait for GitLab to be fully ready
+  shell: |
+    # Wait for database connection
+    until gitlab-rails runner "puts 'DB connected'" 2>/dev/null; do sleep 10; done
+    
+    # Wait for web interface
+    until curl -sIf http://localhost:8080; do sleep 10; done
+    
+    # Wait for background jobs
+    until gitlab-rails runner "puts Sidekiq::ProcessSet.new.size > 0"; do sleep 10; done
+  args:
+    executable: /bin/bash
+  register: gitlab_ready
+  until: gitlab_ready.rc == 0
+  retries: 30
+  delay: 10
+
 - name: Set root password (only if not set)
-  command: gitlab-rails runner "user = User.find(1); user.password = '{{ vault_gitlab_root_password }}'; user.password_confirmation = '{{ vault_gitlab_root_password }}'; user.save!"
+  become: yes
+  become_user: git
+  shell: |
+    /opt/gitlab/bin/gitlab-rails runner -e production <<EOF
+      user = User.find(1)
+      if user.encrypted_password.blank?
+        user.password = '{{ vault_gitlab_root_password }}'
+        user.password_confirmation = '{{ vault_gitlab_root_password }}'
+        user.save!
+        puts "Password set successfully"
+      else
+        puts "Password already set"
+      end
+    EOF
   no_log: true
-  when: password_check.rc != 0
-  notify: reconfigure gitlab
+  register: password_set
+  changed_when: "'Password set successfully' in password_set.stdout"
 
 - name: Ensure GitLab services are running
   shell: gitlab-ctl status

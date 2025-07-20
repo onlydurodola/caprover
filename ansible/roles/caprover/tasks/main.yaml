@@ -117,7 +117,7 @@
     executable: /bin/bash
   when: ansible_os_family == "Debian"
 
-  
+
 
 - name: Run CapRover container (if not running)
   docker_container:
@@ -157,15 +157,28 @@
     creates: /captain/data/config-captain.json
   when: not caprover_installed.stat.exists
 
-- name: Verify CapRover health
-  uri:
-    url: http://localhost:3000
-    status_code: 200
-    timeout: 10
-  register: health_check
-  until: health_check.status == 200
+- name: Check CapRover logs for errors
+  shell: docker logs caprover 2>&1 | grep "Captain is running"
+  register: caprover_logs
+  until: caprover_logs.rc == 0
   retries: 10
   delay: 15
+
+- name: Verify CapRover health
+  shell: |
+    for i in {1..30}; do
+      if curl -sIf http://localhost:3000 >/dev/null; then
+        exit 0
+      fi
+      sleep 10
+    done
+    exit 1
+  args:
+    executable: /bin/bash
+  register: health_check
+  until: health_check.rc == 0
+  retries: 3
+  delay: 10
 
 - name: Allow VPC CIDR in UFW
   ufw:

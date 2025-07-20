@@ -160,6 +160,11 @@ jobs:
           echo "Checking GitLab health..."
           curl -I http://${{ env.GITLAB_IP }} || true
 
+      - name: Debug CapRover
+        run: |
+          ssh ubuntu@${{ env.CAPROVER_IP }} "docker logs caprover"
+        if: ${{ always() }}
+
       - name: Revoke Runner IP from Security Groups
         if: always()
         run: |
