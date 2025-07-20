@@ -28,11 +28,20 @@
   args:
     creates: /usr/bin/gitlab-ctl
   when: not gitlab_installed.stat.exists
+  notify: reconfigure gitlab
 
 - name: Reconfigure GitLab
   command: gitlab-ctl reconfigure
-  become: yes
+  become: true
   when: gitlab_installed.stat.exists
+
+  - name: Wait for reconfiguration to complete
+  wait_for:
+    path: /opt/gitlab/etc/gitlab-rails-rc
+    state: present
+    delay: 10
+    timeout: 300
+  become: true
 
 - name: Configure UFW (idempotent)
   ufw:
@@ -95,7 +104,7 @@
     executable: /bin/bash
   register: gitlab_ready
   until: gitlab_ready.rc == 0
-  retries: 30
+  retries: 50
   delay: 10
 
 - name: Set root password (only if not set)
