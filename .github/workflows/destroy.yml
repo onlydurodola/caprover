@@ -2,7 +2,7 @@ name: Terraform Destroy
 
 on:
   workflow_dispatch:
-  
+
 jobs:
   destroy:
     runs-on: ubuntu-latest
@@ -30,7 +30,6 @@ jobs:
 
       - name: Setup Terraform Variables
         run: |
-          # Format allowed_ips as proper Terraform list
           IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed "s/,/\", \"/g")
           echo "allowed_ips = [\"$IPS_STRING\"]" > secrets.auto.tfvars
           echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
@@ -42,10 +41,4 @@ jobs:
         run: terraform init -backend-config=backend.hcl
 
       - name: Terraform Destroy
-        if: github.ref == 'refs/heads/main'
-        run: |
-          terraform destroy -target module.alb.aws_lb_listener_rule \
-          -target module.alb.aws_lb_listener \
-          -auto-approve
-          sleep 30  # Wait for rules to detach
-          terraform destroy -auto-approve
+        run: terraform destroy -auto-approve
