@@ -35,7 +35,7 @@
   become: true
   when: gitlab_installed.stat.exists
 
-  - name: Wait for reconfiguration to complete
+- name: Wait for reconfiguration to complete
   wait_for:
     path: /opt/gitlab/etc/gitlab-rails-rc
     state: present
