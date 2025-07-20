@@ -118,7 +118,7 @@ jobs:
           done
 
           # GitLab ports
-          gitlab_ports=("22:tcp" "80:tcp" "443:tcp")
+          gitlab_ports=("22:tcp" "8081:tcp")
           for port_spec in "${gitlab_ports[@]}"; do
             IFS=':' read -r port protocol <<< "$port_spec"
             aws ec2 authorize-security-group-ingress \
@@ -185,7 +185,7 @@ jobs:
           done
 
           # GitLab ports
-          gitlab_ports=("22:tcp" "80:tcp" "443:tcp")
+          gitlab_ports=("22:tcp" "8081:tcp")
           for port_spec in "${gitlab_ports[@]}"; do
             IFS=':' read -r port protocol <<< "$port_spec"
             aws ec2 revoke-security-group-ingress \

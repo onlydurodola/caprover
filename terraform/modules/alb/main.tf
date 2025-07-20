@@ -106,7 +106,7 @@ resource "aws_lb_target_group_attachment" "caprover_dashboard" {
 resource "aws_lb_target_group_attachment" "gitlab_http" {
   target_group_arn = aws_lb_target_group.gitlab_http.arn
   target_id        = var.gitlab_instance_id
-  port             = 8080
+  port             = 8081
 }
 
 # Listeners
