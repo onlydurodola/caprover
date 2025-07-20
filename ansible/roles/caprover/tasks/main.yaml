@@ -195,9 +195,10 @@
   ignore_errors: true
 
 - name: Capture CapRover logs
-  shell: docker logs caprover-debug
+  command: docker logs caprover-debug
   register: caprover_logs
-  always_run: true
+  ignore_errors: true
+  become: true
 
 - debug:
     var: caprover_logs.stdout_lines
