@@ -45,6 +45,7 @@ resource "aws_vpc_endpoint" "ecr" {
   security_group_ids  = [var.internal_sg_id]
 
   subnet_ids = aws_subnet.private[*].id
+  depends_on = [module.security_groups] 
 }
 
 resource "aws_internet_gateway" "igw" {

@@ -1,3 +1,7 @@
+resource "random_id" "tg_suffix" {
+  byte_length = 4
+}
+
 resource "aws_lb" "main" {
   name               = "shortlink-alb-${var.env}"
   internal           = false
@@ -59,7 +63,7 @@ resource "aws_lb_target_group" "caprover_dashboard" {
 }
 
 resource "aws_lb_target_group" "gitlab_http" {
-  name        = "gitlab-${var.env}-tg"
+  name        = "gitlab-${var.env}-tg-${random_id.tg_suffix.hex}"
   port        = 8081
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
