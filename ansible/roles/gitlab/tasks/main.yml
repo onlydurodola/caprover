@@ -1,3 +1,4 @@
+---
 - name: Check if GitLab is installed
   stat:
     path: /usr/bin/gitlab-ctl
@@ -20,6 +21,19 @@
     state: present
   when: not gitlab_installed.stat.exists
 
+- name: Install GitLab (if not installed)
+  shell: |
+    curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
+    apt-get install -y gitlab-ce
+  args:
+    creates: /usr/bin/gitlab-ctl
+  when: not gitlab_installed.stat.exists
+
+- name: Reconfigure GitLab
+  command: gitlab-ctl reconfigure
+  become: yes
+  when: gitlab_installed.stat.exists
+
 - name: Configure UFW (idempotent)
   ufw:
     rule: allow
@@ -29,6 +43,7 @@
     - 22
     - 80
     - 443
+    - 8080  # GitLab port
   when: ansible_os_family == "Debian"
   notify: reload ufw
 
@@ -42,14 +57,13 @@
   args:
     executable: /bin/bash
   when: ansible_os_family == "Debian"
+  notify: reload ufw
 
-- name: Install GitLab (if not installed)
-  shell: |
-    curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
-    apt-get install -y gitlab-ce
-  args:
-    creates: /usr/bin/gitlab-ctl
-  when: not gitlab_installed.stat.exists
+- name: Debug UFW status
+  command: ufw status
+  register: ufw_status
+  changed_when: false
+- debug: var=ufw_status.stdout_lines
 
 - name: Configure GitLab settings (idempotent)
   blockinfile:
@@ -60,13 +74,10 @@
       nginx['listen_https'] = false
       nginx['proxy_protocol'] = true
       nginx['real_ip_trusted_addresses'] = ['{{ vpc_cidr }}']
-      nginx['real_ip_header'] = 'X-Forwarded-For'
       gitlab_rails['trusted_proxies'] = ['{{ vpc_cidr }}']
       letsencrypt['enable'] = false
     marker: "# {mark} ANSIBLE MANAGED BLOCK - PROXY SETTINGS"
   notify: reconfigure gitlab
-
-  
 
 - name: Check if root password is set
   shell: |
@@ -77,13 +88,8 @@
 
 - name: Wait for GitLab to be fully ready
   shell: |
-    # Wait for database connection
-    until gitlab-rails runner "puts 'DB connected'" 2>/dev/null; do sleep 10; done
-    
-    # Wait for web interface
+    until gitlab-rails runner "puts 'DB connectedBENCHMARK'" 2>/dev/null; do sleep 10; done
     until curl -sIf http://localhost:8080; do sleep 10; done
-    
-    # Wait for background jobs
     until gitlab-rails runner "puts Sidekiq::ProcessSet.new.size > 0"; do sleep 10; done
   args:
     executable: /bin/bash
@@ -99,6 +105,7 @@
     /opt/gitlab/bin/gitlab-rails runner -e production <<EOF
       user = User.find(1)
       if user.encrypted_password.blank?
+
         user.password = '{{ vault_gitlab_root_password }}'
         user.password_confirmation = '{{ vault_gitlab_root_password }}'
         user.save!
@@ -130,5 +137,3 @@
     state: absent
   with_items: "{{ old_logs.files }}"
   when: old_logs.matched > 0 and ansible_check_mode == false
-
-  #
