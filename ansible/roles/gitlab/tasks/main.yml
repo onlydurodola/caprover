@@ -52,7 +52,7 @@
     - 22
     - 80
     - 443
-    - 8080  # GitLab port
+    - 8081  # GitLab port
   when: ansible_os_family == "Debian"
   notify: reload ufw
 
@@ -79,7 +79,7 @@
     path: /etc/gitlab/gitlab.rb
     block: |
       external_url 'https://gitlab.{{ domain_name }}'
-      nginx['listen_port'] = 8080
+      nginx['listen_port'] = 8081
       nginx['listen_https'] = false
       nginx['proxy_protocol'] = true
       nginx['real_ip_trusted_addresses'] = ['{{ vpc_cidr }}']
@@ -98,7 +98,7 @@
 - name: Wait for GitLab to be fully ready
   shell: |
     until gitlab-rails runner "puts 'DB connectedBENCHMARK'" 2>/dev/null; do sleep 10; done
-    until curl -sIf http://localhost:8080; do sleep 10; done
+    until curl -sIf http://localhost:8081/user/signin; do sleep 10; done
     until gitlab-rails runner "puts Sidekiq::ProcessSet.new.size > 0"; do sleep 10; done
   args:
     executable: /bin/bash
@@ -132,6 +132,15 @@
   register: gitlab_status
   changed_when: "'run:' not in gitlab_status.stdout"
   failed_when: "'down:' in gitlab_status.stdout"
+
+- name: Verify GitLab health
+  uri:
+    url: http://localhost:8081/users/sign_in
+    status_code: [200, 302]
+  register: gitlab_health
+  until: gitlab_health.status == 200 or gitlab_health.status == 302
+  retries: 10
+  delay: 10
 
 - name: Rotate logs instead of truncating
   find:

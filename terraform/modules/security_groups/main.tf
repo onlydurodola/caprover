@@ -1,22 +1,21 @@
 resource "aws_security_group" "internal" {
   name        = "${var.env}-internal-sg"
-  description = "Allow communication between CapRover and GitLab"
+  description = "Allow communication for VPC endpoints"
   vpc_id      = var.vpc_id
 
   ingress {
-    description = "All internal traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [var.vpc_cidr]
-  }
-
-  ingress {
-    description = "VPC Endpoint access"
+    description = "VPC Endpoint HTTPS access"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
+    cidr_blocks = [var.vpc_cidr]  # e.g., ["10.0.0.0/16"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
@@ -34,15 +33,7 @@ resource "aws_security_group" "caprover" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = var.allowed_ips
-  }
-
-  ingress {
-    description     = "Allow from ALB"
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    security_groups = [aws_security_group.alb.id]
+    cidr_blocks = var.allowed_ips  # e.g., ["105.113.0.0/16"]
   }
 
   ingress {
@@ -74,7 +65,7 @@ resource "aws_security_group" "caprover" {
     from_port   = 996
     to_port     = 996
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.vpc_cidr]
   }
 
   ingress {
@@ -82,7 +73,7 @@ resource "aws_security_group" "caprover" {
     from_port   = 7946
     to_port     = 7946
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.vpc_cidr]
   }
 
   ingress {
@@ -90,7 +81,7 @@ resource "aws_security_group" "caprover" {
     from_port   = 7946
     to_port     = 7946
     protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.vpc_cidr]
   }
 
   ingress {
@@ -98,7 +89,7 @@ resource "aws_security_group" "caprover" {
     from_port   = 4789
     to_port     = 4789
     protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.vpc_cidr]
   }
 
   ingress {
@@ -106,14 +97,6 @@ resource "aws_security_group" "caprover" {
     from_port   = 2377
     to_port     = 2377
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Internal VPC traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
     cidr_blocks = [var.vpc_cidr]
   }
 
@@ -139,39 +122,23 @@ resource "aws_security_group" "gitlab" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = var.allowed_ips
-  }
-  
-  ingress {
-    description     = "Allow from ALB"
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    security_groups = [aws_security_group.alb.id]
+    cidr_blocks = var.allowed_ips  # e.g., ["105.113.0.0/16"]
   }
 
   ingress {
-    description     = "HTTP from ALB"
-    from_port       = 80
-    to_port         = 80
+    description     = "GitLab HTTP from ALB"
+    from_port       = 8081
+    to_port         = 8081
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
 
   ingress {
-    description     = "HTTPS from ALB"
-    from_port       = 443
-    to_port         = 443
+    description     = "Internal GitLab access from CapRover"
+    from_port       = 8081
+    to_port         = 8081
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  ingress {
-    description = "Internal VPC traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [var.vpc_cidr]
+    security_groups = [aws_security_group.caprover.id]
   }
 
   egress {
@@ -191,7 +158,6 @@ resource "aws_security_group" "alb" {
   description = "ALB Security Group"
   vpc_id      = var.vpc_id
 
-  # Ingress Rules
   ingress {
     description = "HTTP from anywhere"
     from_port   = 80
@@ -209,20 +175,43 @@ resource "aws_security_group" "alb" {
   }
 
   ingress {
-    description = "Dashboard from anywhere"
+    description = "Dashboard from allowed IPs"
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_ips  # e.g., ["105.113.0.0/16"]
   }
 
-  # Egress Rules - Allow all traffic to VPC
   egress {
-    description      = "Outbound to instances"
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = [var.vpc_cidr]
+    description = "Outbound to GitLab"
+    from_port   = 8081
+    to_port     = 8081
+    protocol    = "tcp"
+    security_groups = [aws_security_group.gitlab.id]
+  }
+
+  egress {
+    description = "Outbound to CapRover HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    security_groups = [aws_security_group.caprover.id]
+  }
+
+  egress {
+    description = "Outbound to CapRover HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    security_groups = [aws_security_group.caprover.id]
+  }
+
+  egress {
+    description = "Outbound to CapRover Dashboard"
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    security_groups = [aws_security_group.caprover.id]
   }
 
   tags = {
