@@ -1,3 +1,4 @@
+---
 - name: Set Python interpreter
   set_fact:
     ansible_python_interpreter: /usr/bin/python3.8
@@ -117,9 +118,7 @@
     executable: /bin/bash
   when: ansible_os_family == "Debian"
 
-
-
-- name: Run CapRover container (if not running)
+- name: Ensure CapRover container is running
   docker_container:
     name: caprover
     image: caprover/caprover
@@ -142,7 +141,6 @@
       BY_PASS_PROXY_CHECK: 'TRUE'
     restart_policy: always
     state: started
-  when: not caprover_installed.stat.exists
 
 - name: Install CapRover CLI (if needed)
   npm:
@@ -156,13 +154,6 @@
   args:
     creates: /captain/data/config-captain.json
   when: not caprover_installed.stat.exists
-
-- name: Check CapRover logs for errors
-  shell: docker logs caprover 2>&1 | grep "Captain is running"
-  register: caprover_logs
-  until: caprover_logs.rc == 0
-  retries: 10
-  delay: 15
 
 - name: Verify CapRover health
   shell: |
