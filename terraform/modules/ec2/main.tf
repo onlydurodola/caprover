@@ -27,7 +27,7 @@ resource "aws_instance" "caprover" {
 
 resource "aws_instance" "gitlab" {
   ami                         = data.aws_ami.ubuntu.id
-  instance_type               = "t3.large"
+  instance_type               = "t3.xlarge"
   subnet_id                   = var.public_subnet_ids[1]
   associate_public_ip_address = true
   vpc_security_group_ids      = [var.gitlab_sg_id]  # gitlab_sg_id

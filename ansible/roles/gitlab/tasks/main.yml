@@ -33,15 +33,14 @@
 - name: Reconfigure GitLab
   command: gitlab-ctl reconfigure
   become: true
-  when: gitlab_installed.stat.exists
+  when: not gitlab_installed.stat.exists
+  register: reconfigure_result
 
-- name: Wait for reconfiguration to complete
-  wait_for:
-    path: /opt/gitlab/etc/gitlab-rails-rc
-    state: present
-    delay: 10
-    timeout: 300
-  become: true
+- name: Wait for SSH to recover after reconfiguration
+  wait_for_connection:
+    delay: 30
+    timeout: 600
+  when: not gitlab_installed.stat.exists
 
 - name: Configure UFW (idempotent)
   ufw:
@@ -88,6 +87,12 @@
     marker: "# {mark} ANSIBLE MANAGED BLOCK - PROXY SETTINGS"
   notify: reconfigure gitlab
 
+- name: Wait for SSH to recover after proxy settings reconfiguration
+  wait_for_connection:
+    delay: 30
+    timeout: 600
+  when: not gitlab_installed.stat.exists
+
 - name: Check if root password is set
   shell: |
     gitlab-rails runner "exit User.find(1).encrypted_password.blank? ? 1 : 0"
@@ -114,7 +119,6 @@
     /opt/gitlab/bin/gitlab-rails runner -e production <<EOF
       user = User.find(1)
       if user.encrypted_password.blank?
-
         user.password = '{{ vault_gitlab_root_password }}'
         user.password_confirmation = '{{ vault_gitlab_root_password }}'
         user.save!
@@ -126,6 +130,12 @@
   no_log: true
   register: password_set
   changed_when: "'Password set successfully' in password_set.stdout"
+
+- name: Wait for SSH to recover after password setting
+  wait_for_connection:
+    delay: 30
+    timeout: 600
+  when: password_set.changed
 
 - name: Ensure GitLab services are running
   shell: gitlab-ctl status

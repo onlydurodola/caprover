@@ -125,6 +125,28 @@
     executable: /bin/bash
   when: ansible_os_family == "Debian"
 
+- name: Clean up stale CapRover containers
+  command: docker rm -f caprover
+  ignore_errors: true
+  become: true
+  when: not caprover_installed.stat.exists
+
+- name: Check if port 2377 is available
+  command: netstat -tulnp | grep :2377
+  register: port_check
+  failed_when: port_check.rc == 0  # Fail if port is in use
+  ignore_errors: true
+  when: not caprover_installed.stat.exists
+
+- name: Reset Docker Swarm if active
+  shell: |
+    if docker info --format '{{ .Swarm.LocalNodeState }}' | grep -q "active"; then
+      docker swarm leave --force
+    fi
+  when: not caprover_installed.stat.exists
+  ignore_errors: true
+  become: true
+
 - name: Ensure CapRover container is running
   docker_container:
     name: caprover
@@ -135,8 +157,8 @@
       - "3000:3000"
       - "996:996"
       - "7946:7946"
-      - "4789:4789"
-      - "2377:2377"
+      - "7946:7946/udp"
+      - "4789:4789/udp"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /captain:/captain
@@ -148,6 +170,16 @@
       BY_PASS_PROXY_CHECK: 'TRUE'
     restart_policy: always
     state: started
+
+- name: Verify CapRover API health
+  uri:
+    url: http://localhost:3000/api/health
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 10
+  delay: 10
+  when: not caprover_installed.stat.exists
 
 - name: Install CapRover CLI (if needed)
   npm:
