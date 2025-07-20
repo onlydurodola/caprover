@@ -36,10 +36,10 @@
   when: not gitlab_installed.stat.exists
   register: reconfigure_result
 
-- name: Wait for SSH to recover after reconfiguration
+- name: Wait for SSH recovery
   wait_for_connection:
-    delay: 30
-    timeout: 600
+    delay: 45  
+    timeout: 900  
   when: not gitlab_installed.stat.exists
 
 - name: Configure UFW (idempotent)
@@ -87,10 +87,11 @@
     marker: "# {mark} ANSIBLE MANAGED BLOCK - PROXY SETTINGS"
   notify: reconfigure gitlab
 
-- name: Wait for SSH to recover after proxy settings reconfiguration
+
+- name: Wait for SSH recovery
   wait_for_connection:
-    delay: 30
-    timeout: 600
+    delay: 45 
+    timeout: 900  
   when: not gitlab_installed.stat.exists
 
 - name: Check if root password is set
@@ -102,15 +103,24 @@
 
 - name: Wait for GitLab to be fully ready
   shell: |
-    until gitlab-rails runner "puts 'DB connectedBENCHMARK'" 2>/dev/null; do sleep 10; done
-    until curl -sIf http://localhost:8081/user/signin; do sleep 10; done
-    until gitlab-rails runner "puts Sidekiq::ProcessSet.new.size > 0"; do sleep 10; done
+    # Increased timeouts based on manual observation (4+ minutes)
+    for i in {1..15}; do
+      if gitlab-rails runner "puts 'DB connectedBENCHMARK'" 2>/dev/null; then
+        if curl -sIf http://localhost:8081/user/sign_in; then
+          if gitlab-rails runner "puts Sidekiq::ProcessSet.new.size > 0"; then
+            exit 0
+          fi
+        fi
+      fi
+      sleep 30  # Increased from 10 to 30 seconds
+    done
+    exit 1
   args:
     executable: /bin/bash
   register: gitlab_ready
   until: gitlab_ready.rc == 0
-  retries: 50
-  delay: 10
+  retries: 3 
+  delay: 0
 
 - name: Set root password (only if not set)
   become: yes
@@ -134,7 +144,7 @@
 - name: Wait for SSH to recover after password setting
   wait_for_connection:
     delay: 30
-    timeout: 600
+    timeout: 900
   when: password_set.changed
 
 - name: Ensure GitLab services are running

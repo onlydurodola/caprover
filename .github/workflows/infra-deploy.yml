@@ -160,10 +160,19 @@ jobs:
           echo "Checking GitLab health..."
           curl -I http://${{ env.GITLAB_IP }} || true
 
-      - name: Debug CapRover
+      - name: Capture instance logs on failure
+        if: ${{ failure() }}
         run: |
-          ssh ubuntu@${{ env.CAPROVER_IP }} "docker logs caprover"
-        if: ${{ always() }}
+          echo "===== CapRover Debug Logs ====="
+          ssh ubuntu@${{ env.CAPROVER_IP }} "docker inspect caprover-debug || true"
+          ssh ubuntu@${{ env.CAPROVER_IP }} "docker logs caprover-debug 2>&1 | tail -n 500 || true"
+          
+          echo "===== GitLab Reconfigure Logs ====="
+          ssh ubuntu@${{ env.GITLAB_IP }} "sudo journalctl -u gitlab-reconfigure -n 100 --no-pager || true"
+          
+          echo "===== System Port Checks ====="
+          ssh ubuntu@${{ env.CAPROVER_IP }} "sudo netstat -tulnp | grep ':2377' || true"
+          ssh ubuntu@${{ env.CAPROVER_IP }} "sudo ss -tulnp | grep ':2377' || true"
 
       - name: Revoke Runner IP from Security Groups
         if: always()

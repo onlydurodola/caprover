@@ -147,9 +147,30 @@
   ignore_errors: true
   become: true
 
-- name: Ensure CapRover container is running
+- name: Free up port 2377
+  shell: |
+    # Check if Docker is using the port
+    if sudo ss -tulnp | grep ':2377' | grep -q dockerd; then
+      echo "Stopping Docker to free port 2377..."
+      sudo systemctl stop docker.socket docker.service
+      sleep 5
+    fi
+    # Ensure nothing else is using the port
+    sudo ss -tulnp | grep ':2377' | awk '{print $7}' | cut -d\" -f2 | xargs -r kill
+    sleep 2
+  become: true
+  when: not caprover_installed.stat.exists
+
+- name: Restart Docker if stopped
+  systemd:
+    name: docker
+    state: started
+    enabled: true
+  when: not caprover_installed.stat.exists
+
+- name: Run CapRover in debug mode
   docker_container:
-    name: caprover
+    name: caprover-debug
     image: caprover/caprover
     ports:
       - "80:80"
@@ -170,6 +191,17 @@
       BY_PASS_PROXY_CHECK: 'TRUE'
     restart_policy: always
     state: started
+  register: caprover_run
+  ignore_errors: true
+
+- name: Capture CapRover logs
+  shell: docker logs caprover-debug
+  register: caprover_logs
+  always_run: true
+
+- debug:
+    var: caprover_logs.stdout_lines
+  when: caprover_run is failed or caprover_logs.stdout != ""
 
 - name: Verify CapRover API health
   uri:
