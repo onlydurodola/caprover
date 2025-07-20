@@ -18,7 +18,7 @@ resource "aws_instance" "caprover" {
   instance_type               = "t3.medium"
   subnet_id                   = var.public_subnet_ids[0]
   associate_public_ip_address = true
-  vpc_security_group_ids      = [var.security_groups[0], var.security_groups[2]]  # caprover_sg_id, internal_sg_id
+  vpc_security_group_ids      = [var.caprover_sg_id]  # caprover_sg_id
   key_name                    = "shortlink"
   tags = {
     Name = "${var.env}-caprover"
@@ -30,7 +30,7 @@ resource "aws_instance" "gitlab" {
   instance_type               = "t3.large"
   subnet_id                   = var.public_subnet_ids[1]
   associate_public_ip_address = true
-  vpc_security_group_ids      = [var.security_groups[1], var.security_groups[2]]  # gitlab_sg_id, internal_sg_id
+  vpc_security_group_ids      = [var.gitlab_sg_id]  # gitlab_sg_id
   key_name                    = "shortlink"
   root_block_device {
     volume_size = 20

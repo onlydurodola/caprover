@@ -1,13 +1,3 @@
-resource "aws_security_group" "internal" {
-  name        = "${var.env}-internal-sg"
-  description = "Allow communication for VPC endpoints"
-  vpc_id      = var.vpc_id
-
-  tags = {
-    Name = "${var.env}-internal-sg"
-  }
-}
-
 resource "aws_security_group" "caprover" {
   name        = "${var.env}-caprover-sg"
   description = "CapRover Security Group"
@@ -38,25 +28,6 @@ resource "aws_security_group" "alb" {
   }
 }
 
-# Internal SG Rules
-resource "aws_security_group_rule" "internal_ingress_https" {
-  security_group_id = aws_security_group.internal.id
-  type              = "ingress"
-  description       = "VPC Endpoint HTTPS access"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  cidr_blocks       = [var.vpc_cidr]
-}
-
-resource "aws_security_group_rule" "internal_egress_all" {
-  security_group_id = aws_security_group.internal.id
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = ["0.0.0.0/0"]
-}
 
 # CapRover SG Rules
 resource "aws_security_group_rule" "caprover_ingress_ssh" {

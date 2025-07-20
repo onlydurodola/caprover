@@ -42,10 +42,9 @@ resource "aws_vpc_endpoint" "ecr" {
   service_name        = "com.amazonaws.${var.aws_region}.ecr.dkr"
   vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
-  security_group_ids  = [var.internal_sg_id]
+  security_group_ids  = [aws_security_group.internal.id]
 
   subnet_ids = aws_subnet.private[*].id
-  depends_on = [module.security_groups] 
 }
 
 resource "aws_internet_gateway" "igw" {
@@ -104,4 +103,32 @@ resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
-#
+
+resource "aws_security_group" "internal" {
+  name        = "${var.env}-internal-sg"
+  description = "Allow communication for VPC endpoints"
+  vpc_id      = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.env}-internal-sg"
+  }
+}
+
+resource "aws_security_group_rule" "internal_ingress_https" {
+  security_group_id = aws_security_group.internal.id
+  type              = "ingress"
+  description       = "VPC Endpoint HTTPS access"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = [var.vpc_cidr]
+}
+
+resource "aws_security_group_rule" "internal_egress_all" {
+  security_group_id = aws_security_group.internal.id
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+}
