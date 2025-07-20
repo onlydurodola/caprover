@@ -12,4 +12,5 @@
 - name: reconfigure gitlab
   command: gitlab-ctl reconfigure
   async: 600 
-  poll: 0
+  poll: 
+  #
