@@ -6,7 +6,6 @@ resource "aws_route53_record" "alb" {
   zone_id = aws_route53_zone.main.zone_id
   name    = var.domain_name
   type    = "A"
-  ttl     = 300 
   alias {
     name                   = var.alb_dns_name
     zone_id                = var.alb_zone_id
@@ -18,7 +17,6 @@ resource "aws_route53_record" "gitlab" {
   zone_id = aws_route53_zone.main.zone_id
   name    = "gitlab.${var.domain_name}"
   type    = "A"
-  ttl     = 300 
   alias {
     name                   = var.alb_dns_name
     zone_id                = var.alb_zone_id
@@ -31,7 +29,6 @@ resource "aws_route53_record" "caprover_dashboard" {
   zone_id = aws_route53_zone.main.zone_id
   name    = "captain.${var.domain_name}"
   type    = "A"
-  ttl     = 300 
   alias {
     name                   = var.alb_dns_name
     zone_id                = var.alb_zone_id
@@ -43,7 +40,6 @@ resource "aws_route53_record" "wildcard" {
   zone_id = aws_route53_zone.main.zone_id
   name    = "*.${var.domain_name}"
   type    = "A"
-  ttl     = 300 
   alias {
     name                   = var.alb_dns_name
     zone_id                = var.alb_zone_id
