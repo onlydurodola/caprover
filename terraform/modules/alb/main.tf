@@ -137,9 +137,14 @@ resource "aws_lb_listener" "https" {
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.caprover_https.arn
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      status_code  = "404"
+      message_body = "Invalid request"
   }
+
+  } 
 }
 
 # Listener Rules
@@ -236,7 +241,7 @@ resource "aws_lb_listener_rule" "https_catch_all" {
   }
   condition {
     host_header {
-      values = ["/*"]  # Catch-all for any unmatched host
+      values = ["*"]  # Catch-all for any unmatched host
     }
   }
 }
