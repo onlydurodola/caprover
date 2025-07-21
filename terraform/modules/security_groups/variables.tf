@@ -5,5 +5,3 @@ variable "env" {
 variable "vpc_cidr" {
   type = string
 }
-
-#

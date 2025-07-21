@@ -35,7 +35,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-region: eu-north-1
-          role-to-assume: arn:aws:iam::${{ secrets.ACC_ID }}:oidc-provider/token.actions.githubusercontent.com
+          role-to-assume: arn:aws:iam::${{ secrets.ACC_ID }}:role/GitHubActionsRole
           role-session-name: GitHubActionsSession
           audience: sts.amazonaws.com
 
