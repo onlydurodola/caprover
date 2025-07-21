@@ -6,3 +6,4 @@ output "gitlab_instance_id" {
   value = aws_instance.gitlab.id
 }
 
+#
