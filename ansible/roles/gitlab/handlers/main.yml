@@ -11,3 +11,8 @@
 - name: reconfigure gitlab
   command: gitlab-ctl reconfigure
   become: true
+
+  - name: restart systemd-resolved
+  systemd:
+    name: systemd-resolved
+    state: restarted

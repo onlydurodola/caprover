@@ -52,6 +52,7 @@ module "route53" {
   alb_dns_name = module.alb.alb_dns_name
   alb_zone_id  = module.alb.alb_zone_id
   gitlab_ip    = module.ec2.gitlab_instance_ip
+  depends_on = [module.alb] 
 }
 
 module "waf" {
@@ -60,4 +61,6 @@ module "waf" {
   alb_arn     = module.alb.alb_arn
   allowed_ips = var.allowed_ips
   env         = var.env
+
+  depends_on = [module.alb]
 }

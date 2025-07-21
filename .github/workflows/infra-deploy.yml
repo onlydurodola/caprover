@@ -163,16 +163,19 @@ jobs:
       - name: Capture instance logs on failure
         if: ${{ failure() }}
         run: |
-          echo "===== CapRover Debug Logs ====="
-          ssh ubuntu@${{ env.CAPROVER_IP }} "docker inspect caprover-debug || true"
-          ssh ubuntu@${{ env.CAPROVER_IP }} "docker logs caprover-debug 2>&1 | tail -n 500 || true"
+          echo "===== TERRAFORM STATE ====="
+          terraform state list
           
-          echo "===== GitLab Reconfigure Logs ====="
-          ssh ubuntu@${{ env.GITLAB_IP }} "sudo journalctl -u gitlab-reconfigure -n 100 --no-pager || true"
+          echo "===== GitLab Workhorse Logs ====="
+          ssh ubuntu@${{ env.GITLAB_IP }} "sudo tail -n 100 /var/log/gitlab/gitlab-workhorse/current"
           
-          echo "===== System Port Checks ====="
-          ssh ubuntu@${{ env.CAPROVER_IP }} "sudo netstat -tulnp | grep ':2377' || true"
-          ssh ubuntu@${{ env.CAPROVER_IP }} "sudo ss -tulnp | grep ':2377' || true"
+          echo "===== GitLab Nginx Error Logs ====="
+          ssh ubuntu@${{ env.GITLAB_IP }} "sudo tail -n 100 /var/log/gitlab/nginx/error.log"
+          
+          echo "===== ALB Target Group Health ====="
+          ALB_ARN=$(aws elbv2 describe-load-balancers --names shortlink-alb-prod --query 'LoadBalancers[0].LoadBalancerArn' --output text --region eu-north-1)
+          TG_ARN=$(aws elbv2 describe-target-groups --load-balancer-arn $ALB_ARN --query 'TargetGroups[?contains(TargetGroupName, `gitlab`)].TargetGroupArn' --output text --region eu-north-1)
+          aws elbv2 describe-target-health --target-group-arn $TG_ARN --region eu-north-1
 
       - name: Revoke Runner IP from Security Groups
         if: always()
