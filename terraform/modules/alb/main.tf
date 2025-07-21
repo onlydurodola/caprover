@@ -236,7 +236,7 @@ resource "aws_lb_listener_rule" "https_catch_all" {
   }
   condition {
     host_header {
-      values = ["*"]  # Catch-all for any unmatched host
+      values = ["/*"]  # Catch-all for any unmatched host
     }
   }
 }
