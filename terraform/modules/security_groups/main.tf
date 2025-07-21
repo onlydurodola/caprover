@@ -29,15 +29,6 @@ resource "aws_security_group" "alb" {
 }
 
 # CapRover SG Rules
-resource "aws_security_group_rule" "caprover_ingress_ssh" {
-  security_group_id = aws_security_group.caprover.id
-  type              = "ingress"
-  description       = "SSH from allowed IPs"
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
-  cidr_blocks       = var.allowed_ips
-}
 
 resource "aws_security_group_rule" "caprover_ingress_http" {
   security_group_id        = aws_security_group.caprover.id
@@ -138,15 +129,6 @@ resource "aws_security_group_rule" "caprover_egress_all" {
 }
 
 # GitLab SG Rules
-resource "aws_security_group_rule" "gitlab_ingress_ssh" {
-  security_group_id = aws_security_group.gitlab.id
-  type              = "ingress"
-  description       = "SSH from allowed IPs"
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
-  cidr_blocks       = var.allowed_ips
-}
 
 resource "aws_security_group_rule" "gitlab_ingress_http_alb" {
   security_group_id        = aws_security_group.gitlab.id
@@ -236,4 +218,25 @@ resource "aws_security_group_rule" "alb_egress_caprover_dashboard" {
   to_port                  = 3000
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.caprover.id
+}
+
+# SSM
+resource "aws_security_group_rule" "ssm_ingress" {
+  security_group_id = aws_security_group.caprover.id
+  type              = "ingress"
+  description       = "SSM access"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]  # SSM uses AWS endpoints
+}
+
+resource "aws_security_group_rule" "ssm_egress" {
+  security_group_id = aws_security_group.caprover.id
+  type              = "egress"
+  description       = "SSM access"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
 }

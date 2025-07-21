@@ -34,11 +34,12 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-north-1
+          role-to-assume: ${{ secrets.AWS_SSM_ROLE_ARN }}
+          role-session-name: GitHubActionsSession
 
       - name: Setup Terraform Variables
         run: |
           IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed 's/,/", "/g')
-          echo "allowed_ips = [\"$IPS_STRING\"]" > secrets.auto.tfvars
           echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
           echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
           echo "aws_region = \"eu-north-1\"" >> secrets.auto.tfvars
@@ -74,6 +75,8 @@ jobs:
           GITLAB_SG_ID=$(terraform output -raw gitlab_sg_id)
           ALB_DNS=$(terraform output -raw alb_dns_name)
           VPC_CIDR=$(terraform output -raw vpc_cidr)
+          CAPROVER_INSTANCE_ID=$(terraform output -raw caprover_instance_id)
+          GITLAB_INSTANCE_ID=$(terraform output -raw gitlab_instance_id)
           
           echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
           echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
@@ -81,64 +84,33 @@ jobs:
           echo "GITLAB_SG_ID=$GITLAB_SG_ID" >> $GITHUB_ENV
           echo "ALB_DNS=$ALB_DNS" >> $GITHUB_ENV
           echo "VPC_CIDR=$VPC_CIDR" >> $GITHUB_ENV 
+          echo "CAPROVER_INSTANCE_ID=$CAPROVER_INSTANCE_ID" >> $GITHUB_ENV
+          echo "GITLAB_INSTANCE_ID=$GITLAB_INSTANCE_ID" >> $GITHUB_ENV
+
+      - name: Verify SSM Connection
+        run: |
+          aws ssm start-session --target ${{ env.GITLAB_INSTANCE_ID }} \
+          --document-name AWS-StartInteractiveCommand \
+          --parameters command="echo 'SSM connection successful for GitLab'"
+              
+          aws ssm start-session --target $CAPROVER_INSTANCE_ID \
+            --document-name AWS-StartInteractiveCommand \
+            --parameters command="echo 'SSM connection successful for CapRover'"
+      
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
           echo "[caprover]" > inventory.ini
-          echo "${{ env.CAPROVER_IP }} ansible_user=ubuntu" >> inventory.ini
+          echo "${{ env.CAPROVER_INSTANCE_ID }} ansible_connection=aws_ssm ansible_aws_ssm_region=eu-north-1 ansible_aws_ssm_bucket_name=terraform-state-bucket-caprover" >> inventory.ini
           echo "[gitlab]" >> inventory.ini
-          echo "${{ env.GITLAB_IP }} ansible_user=ubuntu" >> inventory.ini
+          echo "${{ env.GITLAB_INSTANCE_ID }} ansible_connection=aws_ssm ansible_aws_ssm_region=eu-north-1 ansible_aws_ssm_bucket_name=terraform-state-bucket-caprover" >> inventory.ini
           echo "Inventory created:"
           cat inventory.ini
-
-      - name: Get Runner IP
-        id: runner_ip
-        run: |
-          RUNNER_IP=$(curl -s https://api.ipify.org)
-          echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
-          echo "Runner IP: $RUNNER_IP"
-
-      - name: Allow Runner IP in Security Groups
-        run: |
-          # CapRover ports
-          caprover_ports=(
-            "22:tcp" "80:tcp" "443:tcp" "3000:tcp" "996:tcp" 
-            "7946:tcp" "7946:udp" "4789:udp" "2377:tcp"
-          )
-          
-          for port_spec in "${caprover_ports[@]}"; do
-            IFS=':' read -r port protocol <<< "$port_spec"
-            aws ec2 authorize-security-group-ingress \
-              --group-id ${{ env.CAPROVER_SG_ID }} \
-              --protocol $protocol \
-              --port $port \
-              --cidr ${{ env.RUNNER_IP }}/32 \
-              --region eu-north-1 || echo "Rule exists for CapRover $protocol/$port"
-          done
-
-          # GitLab ports
-          gitlab_ports=("22:tcp" "8081:tcp")
-          for port_spec in "${gitlab_ports[@]}"; do
-            IFS=':' read -r port protocol <<< "$port_spec"
-            aws ec2 authorize-security-group-ingress \
-              --group-id ${{ env.GITLAB_SG_ID }} \
-              --protocol $protocol \
-              --port $port \
-              --cidr ${{ env.RUNNER_IP }}/32 \
-              --region eu-north-1 || echo "Rule exists for GitLab $protocol/$port"
-          done
-
-      - name: Setup SSH Configuration
+      - name: Install Ansible SSM Dependencies
         if: github.ref == 'refs/heads/main'
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 400 ~/.ssh/id_rsa
-          
-          # Scan both IPs simultaneously
-          ssh-keyscan -H ${{ env.CAPROVER_IP }} ${{ env.GITLAB_IP }} >> ~/.ssh/known_hosts
-          echo "SSH configuration complete"
+          pip install boto3
 
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
@@ -156,9 +128,9 @@ jobs:
       - name: Verify  Setup
         run: |
           echo "Checking CapRover health..."
-          curl -I http://${{ env.CAPROVER_IP }}:3000 || true
+          for i in {1..5}; do curl -I http://${{ env.CAPROVER_IP }}:3000 && break || sleep 5; done
           echo "Checking GitLab health..."
-          curl -I http://${{ env.GITLAB_IP }} || true
+          for i in {1..5}; do curl -I http://${{ env.GITLAB_IP }} && break || sleep 5; done
 
       - name: Capture instance logs on failure
         if: ${{ failure() }}
@@ -176,34 +148,3 @@ jobs:
           ALB_ARN=$(aws elbv2 describe-load-balancers --names shortlink-alb-prod --query 'LoadBalancers[0].LoadBalancerArn' --output text --region eu-north-1)
           TG_ARN=$(aws elbv2 describe-target-groups --load-balancer-arn $ALB_ARN --query 'TargetGroups[?contains(TargetGroupName, `gitlab`)].TargetGroupArn' --output text --region eu-north-1)
           aws elbv2 describe-target-health --target-group-arn $TG_ARN --region eu-north-1
-
-      - name: Revoke Runner IP from Security Groups
-        if: always()
-        run: |
-          # CapRover ports
-          caprover_ports=(
-            "22:tcp" "80:tcp" "443:tcp" "3000:tcp" "996:tcp" 
-            "7946:tcp" "7946:udp" "4789:udp" "2377:tcp"
-          )
-          
-          for port_spec in "${caprover_ports[@]}"; do
-            IFS=':' read -r port protocol <<< "$port_spec"
-            aws ec2 revoke-security-group-ingress \
-              --group-id ${{ env.CAPROVER_SG_ID }} \
-              --protocol $protocol \
-              --port $port \
-              --cidr ${{ env.RUNNER_IP }}/32 \
-              --region eu-north-1 || echo "Revoke failed for CapRover $protocol/$port"
-          done
-
-          # GitLab ports
-          gitlab_ports=("22:tcp" "8081:tcp")
-          for port_spec in "${gitlab_ports[@]}"; do
-            IFS=':' read -r port protocol <<< "$port_spec"
-            aws ec2 revoke-security-group-ingress \
-              --group-id ${{ env.GITLAB_SG_ID }} \
-              --protocol $protocol \
-              --port $port \
-              --cidr ${{ env.RUNNER_IP }}/32 \
-              --region eu-north-1 || echo "Revoke failed for GitLab $protocol/$port"
-          done

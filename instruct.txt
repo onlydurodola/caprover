@@ -1,0 +1,3 @@
+I just tried and can't reach it. I want to update all my security groups port 22 to accept ingress from my new IP 154.118.10.80 right from my aws cli
+
+I just discovered that my IP changes regularly, so if you can create a script to get the IDs saved into my local variable and another to inject this rules from the cli

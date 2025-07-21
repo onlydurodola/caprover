@@ -24,3 +24,11 @@ output "waf_web_acl_arn" {
 output "vpc_cidr" {
   value = module.vpc.vpc_cidr
 }
+
+output "caprover_instance_id" {
+  value = module.ec2.caprover_instance_id
+}
+
+output "gitlab_instance_id" {
+  value = module.ec2.gitlab_instance_id
+}

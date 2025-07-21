@@ -18,8 +18,16 @@ resource "aws_instance" "caprover" {
   instance_type               = "t3.medium"
   subnet_id                   = var.public_subnet_ids[0]
   associate_public_ip_address = true
-  vpc_security_group_ids      = [var.caprover_sg_id]  # caprover_sg_id
+  vpc_security_group_ids      = [var.caprover_sg_id]
   key_name                    = "shortlink"
+  iam_instance_profile        = var.iam_instance_profile_name 
+  user_data            = <<-EOF
+                         #!/bin/bash
+                         sudo snap install amazon-ssm-agent --classic
+                         sudo systemctl enable amazon-ssm-agent
+                         sudo systemctl start amazon-ssm-agent
+                         EOF
+
   tags = {
     Name = "${var.env}-caprover"
   }
@@ -30,8 +38,16 @@ resource "aws_instance" "gitlab" {
   instance_type               = "t3.xlarge"
   subnet_id                   = var.public_subnet_ids[1]
   associate_public_ip_address = true
-  vpc_security_group_ids      = [var.gitlab_sg_id]  # gitlab_sg_id
+  vpc_security_group_ids      = [var.gitlab_sg_id]
   key_name                    = "shortlink"
+  iam_instance_profile        = var.iam_instance_profile_name 
+  user_data            = <<-EOF
+                         #!/bin/bash
+                         sudo snap install amazon-ssm-agent --classic
+                         sudo systemctl enable amazon-ssm-agent
+                         sudo systemctl start amazon-ssm-agent
+                         EOF
+  
   root_block_device {
     volume_size = 20
   }

@@ -16,3 +16,18 @@ variable "gitlab_sg_id" {
 variable "env" {
   default = "prod"
 }
+
+variable "iam_instance_profile_name" {
+  description = "IAM instance profile name for SSM"
+  type        = string
+}
+
+output "caprover_instance_ip" {
+  value       = aws_instance.caprover.public_ip
+  description = "The public IP of the CapRover instance"
+}
+
+output "gitlab_instance_ip" {
+  value       = aws_instance.gitlab.public_ip
+  description = "The public IP of the GitLab instance"
+}

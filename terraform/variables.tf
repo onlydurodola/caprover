@@ -16,7 +16,7 @@ variable "private_subnet_cidrs" {
 
 variable "allowed_ips" {
   type    = list(string)
-  default = ["105.113.0.0/16"]
+  default = ["0.0.0.0/0"]
 }
 
 variable "domain_name" {
