@@ -182,7 +182,7 @@
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
-      CAPROVER_ROOT_URL: "https://captain.{{ domain_name }}"
+      CAPROVER_ROOT_URL: "http://captain.{{ domain_name }}"
       ACCEPTED_TERMS: "true"
       MAIN_NODE_IP_ADDRESS: "{{ ansible_host }}"
       BY_PASS_PROXY_CHECK: 'TRUE'
@@ -203,13 +203,29 @@
 
 - name: Verify CapRover API health
   uri:
-    url: https://localhost:3000/api/health
+    url: http://localhost:3000/api/health
     status_code: 200
   register: result
   until: result.status == 200
   retries: 10
   delay: 10
   when: not caprover_installed.stat.exists
+
+- name: Check Docker container status
+  shell: docker ps -a
+  register: docker_ps
+  ignore_errors: true
+
+- name: Check CapRover logs
+  shell: docker logs caprover-debug
+  register: caprover_logs
+  ignore_errors: true
+
+- debug:
+    var: docker_ps.stdout
+
+- debug:
+    var: caprover_logs.stdout
 
 - name: Install CapRover CLI (if needed)
   npm:
@@ -227,7 +243,7 @@
 - name: Verify CapRover health
   shell: |
     for i in {1..30}; do
-      if curl -sIf https://localhost:3000 >/dev/null; then
+      if curl -sIf http://localhost:3000 >/dev/null; then
         exit 0
       fi
       sleep 10

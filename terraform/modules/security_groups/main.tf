@@ -59,6 +59,15 @@ resource "aws_security_group_rule" "caprover_ingress_https" {
   source_security_group_id = aws_security_group.alb.id
 }
 
+resource "aws_security_group_rule" "caprover_ingress_local_https" {
+  security_group_id = aws_security_group.caprover.id
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  self              = true  # Allow self-access
+}
+
 resource "aws_security_group_rule" "caprover_ingress_dashboard" {
   security_group_id        = aws_security_group.caprover.id
   type                     = "ingress"
