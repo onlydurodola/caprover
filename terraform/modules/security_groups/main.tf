@@ -28,7 +28,6 @@ resource "aws_security_group" "alb" {
   }
 }
 
-
 # CapRover SG Rules
 resource "aws_security_group_rule" "caprover_ingress_ssh" {
   security_group_id = aws_security_group.caprover.id
@@ -188,16 +187,6 @@ resource "aws_security_group_rule" "alb_ingress_https" {
   to_port           = 443
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
-}
-
-resource "aws_security_group_rule" "alb_ingress_dashboard" {
-  security_group_id = aws_security_group.alb.id
-  type              = "ingress"
-  description       = "Dashboard from allowed IPs"
-  from_port         = 3000
-  to_port           = 3000
-  protocol          = "tcp"
-  cidr_blocks       = var.allowed_ips
 }
 
 resource "aws_security_group_rule" "alb_egress_gitlab" {
