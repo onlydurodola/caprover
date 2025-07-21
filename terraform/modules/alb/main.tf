@@ -228,20 +228,3 @@ resource "aws_lb_listener_rule" "main_domain" {
   }
 }
 
-resource "aws_lb_listener_rule" "https_catch_all" {
-  listener_arn = aws_lb_listener.https.arn
-  priority     = 500  # Lowest priority to catch unmatched hosts
-  action {
-    type = "fixed-response"
-    fixed_response {
-      content_type = "text/plain"
-      status_code  = "404"
-      message_body = "Route not found. Please check the URL."
-    }
-  }
-  condition {
-    host_header {
-      values = ["*"]  # Catch-all for any unmatched host
-    }
-  }
-}
