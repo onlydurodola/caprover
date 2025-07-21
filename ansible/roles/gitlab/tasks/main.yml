@@ -84,6 +84,10 @@
       letsencrypt['enable'] = false
       gitlab_workhorse['listen_network'] = "tcp"
       gitlab_workhorse['listen_addr'] = "127.0.0.1:8181"
+      puma['worker_processes'] = 2
+      sidekiq['max_concurrency'] = 5
+      postgresql['shared_buffers'] = "256MB"
+      redis['max_memory'] = "100MB"
     marker: "# {mark} ANSIBLE MANAGED BLOCK - PROXY SETTINGS"
   notify: reconfigure gitlab
 
@@ -143,9 +147,9 @@
     - name: Recover SSH connection
       wait_for_connection:
         delay: 10
-        timeout: 300
+        timeout: 1800
       register: ssh_recovery
-      retries: 5
+      retries: 30
       delay: 5
       until: ssh_recovery.state == "started"
 
