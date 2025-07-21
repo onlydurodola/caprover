@@ -61,7 +61,6 @@
 - name: Force update APT cache
   apt:
     update_cache: true
-  cache: true
   when: not caprover_installed.stat.exists
 
 - name: Install Docker components (if needed)
