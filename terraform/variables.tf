@@ -64,3 +64,4 @@ variable "vpn_cidr" {
   type        = string
   default     = "10.100.0.0/22"
 }
+#
