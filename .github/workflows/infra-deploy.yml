@@ -117,6 +117,29 @@ jobs:
           echo "SSM registration timeout"
           exit 1
 
+      - name: Install Ansible Dependencies
+        if: github.ref == 'refs/heads/main'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          /opt/pipx/venvs/ansible-core/bin/pip install --no-cache-dir ansible==9.0.0 boto3==1.34.0 botocore==1.34.0
+          ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
+
+      - name: Debug Python Environment
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Python version:"
+          /opt/pipx/venvs/ansible-core/bin/python --version
+          echo "Pip version:"
+          /opt/pipx/venvs/ansible-core/bin/pip --version
+          echo "Installed packages:"
+          /opt/pipx/venvs/ansible-core/bin/pip list
+
+      - name: Verify Ansible Collections
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ansible-galaxy collection list | grep -E 'community.aws|community.general|community.docker'
+
       - name: Test SSM Connection
         if: github.ref == 'refs/heads/main'
         run: |
@@ -149,25 +172,14 @@ jobs:
           echo "Inventory created:"
           cat inventory.ini
 
-      - name: Install Ansible Dependencies
-        if: github.ref == 'refs/heads/main'
-        run: |
-          # Install required packages
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          
-          # Install Ansible dependencies
-          pip3 install --no-cache-dir boto3 botocore
-          ansible-galaxy collection install community.aws community.general community.docker
-
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          # Use process substitution for secure vault password handling
           ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
-            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
+            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}" \
+            | tee ansible.log
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'

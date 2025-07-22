@@ -4,7 +4,7 @@
   become: true
   connection: community.aws.aws_ssm
   vars:
-    ansible_python_interpreter: /usr/bin/python3
+    ansible_python_interpreter: /opt/pipx/venvs/ansible-core/bin/python
     ansible_user: ubuntu
     ansible_ssm_region: eu-north-1
   roles:
@@ -16,7 +16,7 @@
   become: true
   connection: community.aws.aws_ssm
   vars:
-    ansible_python_interpreter: /usr/bin/python3
+    ansible_python_interpreter: /opt/pipx/venvs/ansible-core/bin/python
     ansible_user: ubuntu
     ansible_ssm_region: eu-north-1
   roles:
