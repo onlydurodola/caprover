@@ -9,6 +9,8 @@
     ansible_ssm_profile: default
     ansible_ssm_executable: /usr/bin/session-manager-plugin
     ansible_ssm_region: eu-north-1
+    ansible_ssm_connection_timeout: 300
+    ansible_ssm_execution_timeout: 1800
   gather_facts: true
   tasks:
     - name: Wait for SSM connection
@@ -30,6 +32,8 @@
     ansible_ssm_profile: default
     ansible_ssm_executable: /usr/bin/session-manager-plugin
     ansible_ssm_region: eu-north-1
+    ansible_ssm_connection_timeout: 300
+    ansible_ssm_execution_timeout: 1800
   gather_facts: true
   tasks:
     - name: Wait for SSM connection

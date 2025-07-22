@@ -91,6 +91,14 @@ jobs:
           echo "CAPROVER_INSTANCE_ID=$CAPROVER_INSTANCE_ID" >> $GITHUB_ENV
           echo "GITLAB_INSTANCE_ID=$GITLAB_INSTANCE_ID" >> $GITHUB_ENV
 
+      - name: Test SSM Connection
+        run: |
+          aws ssm send-command \
+            --instance-ids ${{ env.CAPROVER_INSTANCE_ID }} ${{ env.GITLAB_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["echo SSM connection successful"]' \
+            --region eu-north-1
+      
       - name: Verify SSM Connection
         run: |
           aws ssm start-session --target ${{ env.GITLAB_INSTANCE_ID }} \
@@ -108,15 +116,18 @@ jobs:
           # Create properly formatted inventory file
           cat << EOF > inventory.ini
           [caprover]
-          ${CAPROVER_INSTANCE_ID} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1
+          ${CAPROVER_INSTANCE_ID} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1 ansible_ssh_private_key_file=/tmp/dummy_key
 
           [gitlab]
-          ${GITLAB_INSTANCE_ID} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1
+          ${GITLAB_INSTANCE_ID} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1 ansible_ssh_private_key_file=/tmp/dummy_key
           EOF
           
           # Verify inventory file
           echo "Inventory created:"
           cat inventory.ini
+
+          # Create dummy key file
+          touch /tmp/dummy_key
 
       - name: Install Ansible Dependencies
         if: github.ref == 'refs/heads/main'
@@ -146,6 +157,10 @@ jobs:
             --output text
 
 
+      - name: Update Ansible SSM plugin
+        run: |
+          /opt/pipx/venvs/ansible-core/bin/python -m pip install --upgrade ansible-pylibssm
+      
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
