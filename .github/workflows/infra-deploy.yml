@@ -47,11 +47,11 @@ jobs:
       - name: Setup Terraform Variables
         run: |
           if [ -n "${{ steps.ip.outputs.ipv4 }}" ]; then
-            echo "my_current_ip = \"${{ steps.ip.outputs.ipv4 }}/32\"" >> secrets.auto.tfvars
+            echo "my_current_ip = \["${{ steps.ip.outputs.ipv4 }}/32\"]" >> secrets.auto.tfvars
           else
             echo "my_current_ip = \"\"" >> secrets.auto.tfvars
           fi
-          echo "allowed_ips =  \"${{ secrets.VPN_CIDR }}\"" >> secrets.auto.tfvars
+          echo "allowed_ips =  \["${{ secrets.VPN_CIDR }}\"]" >> secrets.auto.tfvars
           echo "vpn_enabled = \"true\"" >> secrets.auto.tfvars
           echo "root_cert_arn = \"${{ secrets.VPN_ROOT_CERT_ARN }}\"" >> secrets.auto.tfvars
           echo "server_cert_arn = \"${{ secrets.VPN_SERVER_CERT_ARN }}\"" >> secrets.auto.tfvars
