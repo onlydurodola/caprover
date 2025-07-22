@@ -50,7 +50,8 @@ jobs:
           echo "waf_enabled = \"true\"" >> secrets.auto.tfvars
 
       - name: Terraform Init
-        run: terraform大楼: terraform init -backend-config=backend.hcl -input=false -reconfigure
+        run: |
+          terraform init -backend-config=backend.hcl -input=false -reconfigure
       
       - name: Terraform Format
         run: |
