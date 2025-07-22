@@ -25,9 +25,12 @@ resource "aws_instance" "caprover" {
                          #!/bin/bash
                          sudo apt update
                          sudo apt install -y python3 python3-distutils
-                         sudo snap install amazon-ssm-agent --classic
+                         wget https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_amd64/amazon-ssm-agent.deb
+                         sudo dpkg -i amazon-ssm-agent.deb
                          sudo systemctl enable amazon-ssm-agent
                          sudo systemctl start amazon-ssm-agent
+                         until sudo systemctl is-active amazon-ssm-agent; do sleep 5; done
+                         rm amazon-ssm-agent.deb
                          EOF
   lifecycle {
     ignore_changes = [associate_public_ip_address]
@@ -50,9 +53,12 @@ resource "aws_instance" "gitlab" {
                          #!/bin/bash
                          sudo apt update
                          sudo apt install -y python3 python3-distutils
-                         sudo snap install amazon-ssm-agent --classic
+                         wget https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_amd64/amazon-ssm-agent.deb
+                         sudo dpkg -i amazon-ssm-agent.deb
                          sudo systemctl enable amazon-ssm-agent
                          sudo systemctl start amazon-ssm-agent
+                         until sudo systemctl is-active amazon-ssm-agent; do sleep 5; done
+                         rm amazon-ssm-agent.deb
                          EOF
   lifecycle {
     ignore_changes = [associate_public_ip_address]
