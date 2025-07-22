@@ -132,3 +132,39 @@ resource "aws_security_group_rule" "internal_egress_all" {
   protocol          = "-1"
   cidr_blocks       = ["0.0.0.0/0"]
 }
+
+resource "aws_vpc_endpoint" "ssm" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.ssm"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  security_group_ids  = [aws_security_group.internal.id]
+  subnet_ids          = aws_subnet.private[*].id
+  tags = {
+    Name = "${var.env}-ssm-endpoint"
+  }
+}
+
+resource "aws_vpc_endpoint" "ssm_messages" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.ssmmessages"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  security_group_ids  = [aws_security_group.internal.id]
+  subnet_ids          = aws_subnet.private[*].id
+  tags = {
+    Name = "${var.env}-ssm-messages-endpoint"
+  }
+}
+
+resource "aws_vpc_endpoint" "ec2_messages" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.ec2messages"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  security_group_ids  = [aws_security_group.internal.id]
+  subnet_ids          = aws_subnet.private[*].id
+  tags = {
+    Name = "${var.env}-ec2-messages-endpoint"
+  }
+}
