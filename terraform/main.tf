@@ -43,6 +43,7 @@ module "security_groups" {
   vpc_id   = module.vpc.vpc_id
   vpc_cidr = var.vpc_cidr
   env      = var.env
+  my_current_ip = var.my_current_ip
 }
 
 module "ecr" {
@@ -88,5 +89,15 @@ module "waf" {
   allowed_ips = var.allowed_ips
   env         = var.env
 
-  depends_on = [module.alb]
+}
+
+module "vpn" {
+  count             = 0
+  source            = "./modules/vpn"
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+  env               = var.env
+  root_cert_arn     = var.root_cert_arn
+  server_cert_arn   = var.server_cert_arn
+  vpn_cidr          = var.vpn_cidr
 }

@@ -34,3 +34,33 @@ variable "waf_enabled" {
   type        = bool
   default     = true
 }
+
+variable "my_current_ip" {
+  description = "Current public IP for temporary access"
+  type        = string
+  default     = ""
+}
+
+variable "vpn_enabled" {
+  description = "Enable AWS Client VPN"
+  type        = bool
+  default     = true
+}
+
+variable "root_cert_arn" {
+  description = "ARN of the root certificate for VPN"
+  type        = string
+  default     = ""
+}
+
+variable "server_cert_arn" {
+  description = "ARN of the server certificate for VPN"
+  type        = string
+  default     = ""
+}
+
+variable "vpn_cidr" {
+  description = "CIDR block for VPN clients"
+  type        = string
+  default     = "10.100.0.0/22"
+}

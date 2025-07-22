@@ -8,6 +8,8 @@ resource "aws_lb" "main" {
   load_balancer_type = "application"
   security_groups    = [var.security_group_id]
   subnets            = var.public_subnet_ids
+
+
   tags = {
     Name = "${var.env}-alb"
   }
@@ -93,6 +95,7 @@ resource "aws_lb_target_group_attachment" "caprover_http" {
   target_group_arn = aws_lb_target_group.caprover_http.arn
   target_id        = var.caprover_instance_id
   port             = 80
+  
 }
 
 resource "aws_lb_target_group_attachment" "caprover_https" {

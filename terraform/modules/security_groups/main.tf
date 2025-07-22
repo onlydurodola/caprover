@@ -160,6 +160,19 @@ resource "aws_security_group_rule" "gitlab_egress_all" {
 }
 
 # ALB SG Rules
+
+resource "aws_security_group_rule" "alb_ingress_myip" {
+  count = var.my_current_ip != "" ? 1 : 0
+  
+  security_group_id = aws_security_group.alb.id
+  type              = "ingress"
+  description       = "Access from my current IP"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = [var.my_current_ip]
+}
+
 resource "aws_security_group_rule" "alb_ingress_http" {
   security_group_id = aws_security_group.alb.id
   type              = "ingress"
@@ -240,3 +253,4 @@ resource "aws_security_group_rule" "ssm_egress" {
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
 }
+

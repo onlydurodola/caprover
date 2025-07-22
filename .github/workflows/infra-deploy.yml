@@ -39,6 +39,27 @@ jobs:
           role-session-name: GitHubActionsSession
           audience: sts.amazonaws.com
 
+      - name: Get current IP
+        id: ip
+        uses: haythem/public-ip@v2.0
+        continue-on-error: true
+        
+      - name: Setup Terraform Variables
+        run: |
+          if [ -n "${{ steps.ip.outputs.ipv4 }}" ]; then
+            echo "my_current_ip = \"${{ steps.ip.outputs.ipv4 }}/32\"" >> secrets.auto.tfvars
+          else
+            echo "my_current_ip = \"\"" >> secrets.auto.tfvars
+          fi
+          echo "allowed_ips =  \"${{ secrets.VPN_CIDR }}\"" >> secrets.auto.tfvars
+          echo "vpn_enabled = \"true\"" >> secrets.auto.tfvars
+          echo "root_cert_arn = \"${{ secrets.VPN_ROOT_CERT_ARN }}\"" >> secrets.auto.tfvars
+          echo "server_cert_arn = \"${{ secrets.VPN_SERVER_CERT_ARN }}\"" >> secrets.auto.tfvars
+          echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
+          echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
+          echo "aws_region = \"eu-north-1\"" >> secrets.auto.tfvars
+          echo "waf_enabled = \"true\"" >> secrets.auto.tfvars
+
       - name: Setup Terraform Variables
         run: |
           IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed 's/,/", "/g')

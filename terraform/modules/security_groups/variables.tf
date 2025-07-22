@@ -5,3 +5,4 @@ variable "env" {
 variable "vpc_cidr" {
   type = string
 }
+variable "my_current_ip" {}

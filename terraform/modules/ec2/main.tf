@@ -27,7 +27,10 @@ resource "aws_instance" "caprover" {
                          sudo systemctl enable amazon-ssm-agent
                          sudo systemctl start amazon-ssm-agent
                          EOF
-
+  lifecycle {
+    ignore_changes = [associate_public_ip_address]
+    create_before_destroy = true
+  }
   tags = {
     Name = "${var.env}-caprover"
   }
@@ -47,7 +50,11 @@ resource "aws_instance" "gitlab" {
                          sudo systemctl enable amazon-ssm-agent
                          sudo systemctl start amazon-ssm-agent
                          EOF
-  
+  lifecycle {
+    ignore_changes = [associate_public_ip_address]
+    create_before_destroy = true
+  }
+
   root_block_device {
     volume_size = 20
   }
