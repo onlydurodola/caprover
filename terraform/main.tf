@@ -92,7 +92,7 @@ module "waf" {
 }
 
 module "vpn" {
-  count             = 0
+  count             = var.vpn_enabled ? 1 : 0
   source            = "./modules/vpn"
   vpc_id            = module.vpc.vpc_id
   public_subnet_ids = module.vpc.public_subnet_ids
