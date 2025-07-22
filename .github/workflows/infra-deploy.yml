@@ -6,7 +6,6 @@ on:
     paths:
       - 'terraform/**'
       - 'ansible/**'
-  
 
 jobs:
   deploy:
@@ -91,106 +90,112 @@ jobs:
           echo "CAPROVER_INSTANCE_ID=$CAPROVER_INSTANCE_ID" >> $GITHUB_ENV
           echo "GITLAB_INSTANCE_ID=$GITLAB_INSTANCE_ID" >> $GITHUB_ENV
 
+      - name: Wait for SSM Registration
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # Wait for instances to register with SSM
+          echo "Waiting for SSM registration..."
+          for i in {1..15}; do
+            cap_status=$(aws ssm describe-instance-information \
+              --filters Key=InstanceIds,Values=${{ env.CAPROVER_INSTANCE_ID }} \
+              --query 'InstanceInformationList[0].PingStatus' \
+              --output text)
+            
+            git_status=$(aws ssm describe-instance-information \
+              --filters Key=InstanceIds,Values=${{ env.GITLAB_INSTANCE_ID }} \
+              --query 'InstanceInformationList[0].PingStatus' \
+              --output text)
+            
+            echo "CapRover status: $cap_status, GitLab status: $git_status"
+            
+            if [[ "$cap_status" == "Online" && "$git_status" == "Online" ]]; then
+              echo "Both instances online"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "SSM registration timeout"
+          exit 1
+
       - name: Test SSM Connection
+        if: github.ref == 'refs/heads/main'
         run: |
           aws ssm send-command \
-            --instance-ids ${{ env.CAPROVER_INSTANCE_ID }} ${{ env.GITLAB_INSTANCE_ID }} \
+            --instance-ids ${{ env.CAPROVER_INSTANCE_ID }} \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["echo SSM connection successful"]' \
-            --region eu-north-1
-      
-      - name: Verify SSM Connection
-        run: |
-          aws ssm start-session --target ${{ env.GITLAB_INSTANCE_ID }} \
-          --document-name AWS-StartInteractiveCommand \
-          --parameters '{"command":["echo \"SSM connection successful for GitLab\""]}'
-              
-          aws ssm start-session --target $CAPROVER_INSTANCE_ID \
-            --document-name AWS-StartInteractiveCommand \
-            --parameters '{"command":["echo \"SSM connection successful for CapRover\""]}'   
+            --parameters 'commands=["echo SSM-TEST-SUCCESS-CAPROVER"]' \
+            --region eu-north-1 \
+            --output text
+          
+          aws ssm send-command \
+            --instance-ids ${{ env.GITLAB_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["echo SSM-TEST-SUCCESS-GITLAB"]' \
+            --region eu-north-1 \
+            --output text
 
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          # Create properly formatted inventory file
           cat << EOF > inventory.ini
           [caprover]
-          ${CAPROVER_INSTANCE_ID} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1 ansible_ssh_private_key_file=/tmp/dummy_key
+          ${{ env.CAPROVER_INSTANCE_ID }} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1
 
           [gitlab]
-          ${GITLAB_INSTANCE_ID} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1 ansible_ssh_private_key_file=/tmp/dummy_key
+          ${{ env.GITLAB_INSTANCE_ID }} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1
           EOF
           
-          # Verify inventory file
           echo "Inventory created:"
           cat inventory.ini
-
-          # Create dummy key file
-          touch /tmp/dummy_key
 
       - name: Install Ansible Dependencies
         if: github.ref == 'refs/heads/main'
         run: |
-          /opt/pipx/venvs/ansible-core/bin/python -m pip install --upgrade boto3
-          /opt/pipx/venvs/ansible-core/bin/ansible-galaxy collection install community.aws community.general community.docker --force
-
-      - name: Debug Python Info
-        run: |
-          echo "Ansible Python path: $(which ansible)"
-          echo "System Python path: $(which python)"
-          echo "Pip list:"
-          pip list
-          echo "Ansible environment pip list:"
-          /opt/pipx/venvs/ansible-core/bin/python -m pip list
-
-      - name: Verify SSM Agent Status
-        run: |
-          aws ssm describe-instance-information \
-            --instance-information-filter-list key=InstanceIds,valueSet=${{ env.CAPROVER_INSTANCE_ID }} \
-            --query 'InstanceInformationList[0].PingStatus' \
-            --output text
+          # Install required packages
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
           
-          aws ssm describe-instance-information \
-            --instance-information-filter-list key=InstanceIds,valueSet=${{ env.GITLAB_INSTANCE_ID }} \
-            --query 'InstanceInformationList[0].PingStatus' \
-            --output text
+          # Install Ansible dependencies
+          pip3 install --no-cache-dir boto3 botocore
+          ansible-galaxy collection install community.aws community.general community.docker
 
-
-      - name: Update Ansible SSM plugin
-        run: |
-          /opt/pipx/venvs/ansible-core/bin/python -m pip install --upgrade ansible-pylibssm
-      
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          ansible-playbook -i inventory.ini playbook.yml -vv \
+          # Use process substitution for secure vault password handling
+          ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
 
-                shred -zu .vault_pass
-
-      - name: Verify  Setup
+      - name: Verify Application Health
+        if: github.ref == 'refs/heads/main'
         run: |
-          echo "Checking CapRover health..."
-          for i in {1..5}; do curl -I http://${{ env.CAPROVER_IP }}:3000 && break || sleep 5; done
-          echo "Checking GitLab health..."
-          for i in {1..5}; do curl -I http://${{ env.GITLAB_IP }} && break || sleep 5; done
+          # Test through ALB (allow redirects)
+          echo "Testing CapRover dashboard:"
+          curl -sL -o /dev/null -w "%{http_code}" "https://captain.${{ secrets.DOMAIN_NAME }}" | grep -q 200
+          
+          echo "Testing GitLab:"
+          curl -sL -o /dev/null -w "%{http_code}" "https://gitlab.${{ secrets.DOMAIN_NAME }}" | grep -q 200
 
-      - name: Capture instance logs on failure
+      - name: Capture Debug Info on Failure
         if: ${{ failure() }}
         run: |
-          echo "===== TERRAFORM STATE ====="
-          terraform state list
+          echo "===== SSM AGENT STATUS ====="
+          aws ssm describe-instance-information \
+            --filters Key=InstanceIds,Values=${{ env.CAPROVER_INSTANCE_ID }} \
+            --query 'InstanceInformationList[0]'
           
-          echo "===== GitLab Workhorse Logs ====="
-          ssh ubuntu@${{ env.GITLAB_IP }} "sudo tail -n 100 /var/log/gitlab/gitlab-workhorse/current"
+          aws ssm describe-instance-information \
+            --filters Key=InstanceIds,Values=${{ env.GITLAB_INSTANCE_ID }} \
+            --query 'InstanceInformationList[0]'
           
-          echo "===== GitLab Nginx Error Logs ====="
-          ssh ubuntu@${{ env.GITLAB_IP }} "sudo tail -n 100 /var/log/gitlab/nginx/error.log"
+          echo "===== INSTANCE SYSTEM LOGS ====="
+          aws ec2 get-console-output --instance-id ${{ env.CAPROVER_INSTANCE_ID }} --output text
+          aws ec2 get-console-output --instance-id ${{ env.GITLAB_INSTANCE_ID }} --output text
           
-          echo "===== ALB Target Group Health ====="
-          ALB_ARN=$(aws elbv2 describe-load-balancers --names shortlink-alb-prod --query 'LoadBalancers[0].LoadBalancerArn' --output text --region eu-north-1)
-          TG_ARN=$(aws elbv2 describe-target-groups --load-balancer-arn $ALB_ARN --query 'TargetGroups[?contains(TargetGroupName, `gitlab`)].TargetGroupArn' --output text --region eu-north-1)
-          aws elbv2 describe-target-health --target-group-arn $TG_ARN --region eu-north-1
+          echo "===== ANSIBLE LOGS ====="
+          if [ -f ansible.log ]; then
+            cat ansible.log
+          fi

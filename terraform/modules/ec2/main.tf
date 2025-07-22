@@ -21,31 +21,16 @@ resource "aws_instance" "caprover" {
   vpc_security_group_ids      = [var.caprover_sg_id]
   key_name                    = "shortlink"
   iam_instance_profile        = var.iam_instance_profile_name
-  user_data                   = <<-EOF
+  user_data = <<-EOF
     #!/bin/bash
-    set -e
-    # Update and install prerequisites
-    sudo apt-get update -y
-    sudo apt-get install -y python3 python3-distutils
-    # Check if SSM Agent is already installed
-    if ! dpkg -l | grep -q amazon-ssm-agent; then
-      # Download and install SSM Agent
-      wget -q https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_amd64/amazon-ssm-agent.deb
-      sudo dpkg -i amazon-ssm-agent.deb
-      rm amazon-ssm-agent.deb
-    fi
-    # Ensure SSM Agent service is enabled and started
-    sudo systemctl enable amazon-ssm-agent
-    sudo systemctl start amazon-ssm-agent
-    # Wait for SSM Agent to be active
-    for i in {1..5}; do
-      if sudo systemctl is-active amazon-ssm-agent >/dev/null; then
-        exit 0
-      fi
-      sleep 5
-    done
-    exit 1
+    sudo apt update -y
+    sudo apt install -y python3 python3-distutils
+    sudo snap install amazon-ssm-agent --classic
+    sudo snap start amazon-ssm-agent
+    echo "SSM Agent status:"
+    sudo snap services amazon-ssm-agent
     EOF
+
   lifecycle {
     ignore_changes = [associate_public_ip_address]
     create_before_destroy = true
@@ -63,31 +48,16 @@ resource "aws_instance" "gitlab" {
   vpc_security_group_ids      = [var.gitlab_sg_id]
   key_name                    = "shortlink"
   iam_instance_profile        = var.iam_instance_profile_name
-  user_data                   = <<-EOF
+  user_data = <<-EOF
     #!/bin/bash
-    set -e
-    # Update and install prerequisites
-    sudo apt-get update -y
-    sudo apt-get install -y python3 python3-distutils
-    # Check if SSM Agent is already installed
-    if ! dpkg -l | grep -q amazon-ssm-agent; then
-      # Download and install SSM Agent
-      wget -q https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_amd64/amazon-ssm-agent.deb
-      sudo dpkg -i amazon-ssm-agent.deb
-      rm amazon-ssm-agent.deb
-    fi
-    # Ensure SSM Agent service is enabled and started
-    sudo systemctl enable amazon-ssm-agent
-    sudo systemctl start amazon-ssm-agent
-    # Wait for SSM Agent to be active
-    for i in {1..5}; do
-      if sudo systemctl is-active amazon-ssm-agent >/dev/null; then
-        exit 0
-      fi
-      sleep 5
-    done
-    exit 1
+    sudo apt update -y
+    sudo apt install -y python3 python3-distutils
+    sudo snap install amazon-ssm-agent --classic
+    sudo snap start amazon-ssm-agent
+    echo "SSM Agent status:"
+    sudo snap services amazon-ssm-agent
     EOF
+
   lifecycle {
     ignore_changes = [associate_public_ip_address]
     create_before_destroy = true
