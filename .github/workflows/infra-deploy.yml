@@ -60,15 +60,6 @@ jobs:
           echo "aws_region = \"eu-north-1\"" >> secrets.auto.tfvars
           echo "waf_enabled = \"true\"" >> secrets.auto.tfvars
 
-      - name: Setup Terraform Variables
-        run: |
-          IPS_STRING=$(echo '${{ secrets.ALLOWED_IPS }}' | sed 's/,/", "/g')
-          echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
-          echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
-          echo "aws_region = \"eu-north-1\"" >> secrets.auto.tfvars
-          echo "waf_enabled = \"${{ secrets.ENABLE_WAF || 'false' }}\"" >> secrets.auto.tfvars
-          cat secrets.auto.tfvars
-
       - name: Terraform Init
         run: terraform init -backend-config=backend.hcl -input=false -reconfigure
       
