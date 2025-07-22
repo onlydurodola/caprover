@@ -41,7 +41,7 @@ jobs:
 
       - name: Get current IP
         id: ip
-        uses: haythem/public-ip@v2.0
+        uses: haythem/public-ip@v1.3
         continue-on-error: true
         
       - name: Setup Terraform Variables
