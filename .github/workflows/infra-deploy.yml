@@ -41,7 +41,7 @@ jobs:
         
       - name: Setup Terraform Variables
         run: |
-          echo "allowed_ips =  \["${{ secrets.VPN_CIDR }}\"]" >> secrets.auto.tfvars
+          echo "allowed_ips =  [\"${{ secrets.VPN_CIDR }}\"]" >> secrets.auto.tfvars
           echo "vpn_enabled = \"true\"" >> secrets.auto.tfvars
           echo "root_cert_arn = \"${{ secrets.VPN_ROOT_CERT_ARN }}\"" >> secrets.auto.tfvars
           echo "server_cert_arn = \"${{ secrets.VPN_SERVER_CERT_ARN }}\"" >> secrets.auto.tfvars
