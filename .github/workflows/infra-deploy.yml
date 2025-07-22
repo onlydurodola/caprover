@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production
     permissions:
       id-token: write
@@ -50,7 +50,7 @@ jobs:
           echo "waf_enabled = \"true\"" >> secrets.auto.tfvars
 
       - name: Terraform Init
-        run: terraform init -backend-config=backend.hcl -input=false -reconfigure
+        run: terraform大楼: terraform init -backend-config=backend.hcl -input=false -reconfigure
       
       - name: Terraform Format
         run: |
@@ -93,7 +93,6 @@ jobs:
       - name: Wait for SSM Registration
         if: github.ref == 'refs/heads/main'
         run: |
-          # Wait for instances to register with SSM
           echo "Waiting for SSM registration..."
           for i in {1..15}; do
             cap_status=$(aws ssm describe-instance-information \
@@ -122,18 +121,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip
-          /opt/pipx/venvs/ansible-core/bin/pip install --no-cache-dir ansible==9.0.0 boto3==1.34.0 botocore==1.34.0
+          sudo pip3 install --no-cache-dir ansible==9.0.0 boto3==1.34.0 botocore==1.34.0
           ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
 
       - name: Debug Python Environment
         if: github.ref == 'refs/heads/main'
         run: |
           echo "Python version:"
-          /opt/pipx/venvs/ansible-core/bin/python --version
+          /usr/bin/python3 --version
           echo "Pip version:"
-          /opt/pipx/venvs/ansible-core/bin/pip --version
+          /usr/bin/pip3 --version
           echo "Installed packages:"
-          /opt/pipx/venvs/ansible-core/bin/pip list
+          /usr/bin/pip3 list
 
       - name: Verify Ansible Collections
         if: github.ref == 'refs/heads/main'
@@ -184,7 +183,6 @@ jobs:
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'
         run: |
-          # Test through ALB (allow redirects)
           echo "Testing CapRover dashboard:"
           curl -sL -o /dev/null -w "%{http_code}" "https://captain.${{ secrets.DOMAIN_NAME }}" | grep -q 200
           
