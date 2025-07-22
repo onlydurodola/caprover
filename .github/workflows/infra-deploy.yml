@@ -122,8 +122,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           /opt/pipx/venvs/ansible-core/bin/python -m pip install --upgrade boto3
-          /opt/pipx/venvs/ansible-core/bin/ansible-galaxy collection install community.aws community.general community.docker
-          
+          /opt/pipx/venvs/ansible-core/bin/ansible-galaxy collection install community.aws community.general community.docker --force
+
       - name: Debug Python Info
         run: |
           echo "Ansible Python path: $(which ansible)"
@@ -132,6 +132,18 @@ jobs:
           pip list
           echo "Ansible environment pip list:"
           /opt/pipx/venvs/ansible-core/bin/python -m pip list
+
+      - name: Verify SSM Agent Status
+        run: |
+          aws ssm describe-instance-information \
+            --instance-information-filter-list key=InstanceIds,valueSet=${{ env.CAPROVER_INSTANCE_ID }} \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text
+          
+          aws ssm describe-instance-information \
+            --instance-information-filter-list key=InstanceIds,valueSet=${{ env.GITLAB_INSTANCE_ID }} \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text
 
 
       - name: Run Ansible Configuration

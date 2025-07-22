@@ -24,7 +24,7 @@ resource "aws_instance" "caprover" {
   user_data            = <<-EOF
                          #!/bin/bash
                          sudo apt update
-                         sudo apt install -y python3 python3-pip
+                         sudo apt install -y python3 python3-distutils
                          sudo snap install amazon-ssm-agent --classic
                          sudo systemctl enable amazon-ssm-agent
                          sudo systemctl start amazon-ssm-agent
@@ -49,7 +49,7 @@ resource "aws_instance" "gitlab" {
   user_data            = <<-EOF
                          #!/bin/bash
                          sudo apt update
-                         sudo apt install -y python3 python3-pip
+                         sudo apt install -y python3 python3-distutils
                          sudo snap install amazon-ssm-agent --classic
                          sudo systemctl enable amazon-ssm-agent
                          sudo systemctl start amazon-ssm-agent

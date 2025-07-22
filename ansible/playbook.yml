@@ -5,6 +5,8 @@
   connection: community.aws.aws_ssm
   vars:
     ansible_python_interpreter: /usr/bin/python3
+    ansible_user: ubuntu
+    ansible_ssm_profile: default
     ansible_ssm_executable: /usr/bin/session-manager-plugin
     ansible_ssm_region: eu-north-1
   roles:
@@ -17,6 +19,8 @@
   connection: community.aws.aws_ssm
   vars:
     ansible_python_interpreter: /usr/bin/python3
+    ansible_user: ubuntu
+    ansible_ssm_profile: default
     ansible_ssm_executable: /usr/bin/session-manager-plugin
     ansible_ssm_region: eu-north-1
   roles:
