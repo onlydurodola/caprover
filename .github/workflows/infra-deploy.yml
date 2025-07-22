@@ -38,19 +38,9 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.ACC_ID }}:role/GitHubActionsRole
           role-session-name: GitHubActionsSession
           audience: sts.amazonaws.com
-
-      - name: Get current IP
-        id: ip
-        uses: haythem/public-ip@v1.3
-        continue-on-error: true
         
       - name: Setup Terraform Variables
         run: |
-          if [ -n "${{ steps.ip.outputs.ipv4 }}" ]; then
-            echo "my_current_ip = \["${{ steps.ip.outputs.ipv4 }}/32\"]" >> secrets.auto.tfvars
-          else
-            echo "my_current_ip = \"\"" >> secrets.auto.tfvars
-          fi
           echo "allowed_ips =  \["${{ secrets.VPN_CIDR }}\"]" >> secrets.auto.tfvars
           echo "vpn_enabled = \"true\"" >> secrets.auto.tfvars
           echo "root_cert_arn = \"${{ secrets.VPN_ROOT_CERT_ARN }}\"" >> secrets.auto.tfvars
