@@ -35,12 +35,6 @@
   when: not gitlab_installed.stat.exists
   register: reconfigure_result
 
-- name: Wait for SSH recovery
-  wait_for_connection:
-    delay: 45  
-    timeout: 900  
-  when: not gitlab_installed.stat.exists
-
 - name: Configure UFW (idempotent)
   ufw:
     rule: allow
@@ -100,12 +94,6 @@
     marker: "# {mark} ANSIBLE MANAGED BLOCK"
   notify: restart systemd-resolved
 
-- name: Wait for SSH recovery
-  wait_for_connection:
-    delay: 45 
-    timeout: 900  
-  when: not gitlab_installed.stat.exists
-
 - name: Capture SSH logs
   shell: tail -n 50 /var/log/auth.log
   register: ssh_logs
@@ -123,35 +111,27 @@
   register: system_load
 - debug: var=system_load.stdout_lines
 
-- block:
-    - name: Wait for GitLab to be fully ready
-      shell: |
-        for i in {1..15}; do
-          if gitlab-rails runner "puts 'DB connectedBENCHMARK'" 2>/dev/null; then
-            if curl -sIf http://localhost:8081/users/sign_in; then
-              if gitlab-rails runner "puts Sidekiq::ProcessSet.new.size > 0"; then
-                exit 0
-              fi
-            fi
+
+- name: Wait for GitLab to be fully ready
+  shell: |
+    for i in {1..15}; do
+      if gitlab-rails runner "puts 'DB connectedBENCHMARK'" 2>/dev/null; then
+        if curl -sIf http://localhost:8081/users/sign_in; then
+          if gitlab-rails runner "puts Sidekiq::ProcessSet.new.size > 0"; then
+            exit 0
           fi
-          sleep 30
-        done
-        exit 1
-      args:
-        executable: /bin/bash
-      register: gitlab_ready
-      until: gitlab_ready.rc == 0
-      retries: 3
-      delay: 0
-  rescue:
-    - name: Recover SSH connection
-      wait_for_connection:
-        delay: 10
-        timeout: 1800
-      register: ssh_recovery
-      retries: 30
-      delay: 5
-      until: ssh_recovery.state == "started"
+        fi
+      fi
+      sleep 30
+    done
+    exit 1
+  args:
+    executable: /bin/bash
+  register: gitlab_ready
+  until: gitlab_ready.rc == 0
+  retries: 3
+  delay: 0
+  
 
 - name: Verify GitLab external health
   uri:
@@ -181,12 +161,6 @@
   no_log: true
   register: password_set
   changed_when: "'Password set successfully' in password_set.stdout"
-
-- name: Wait for SSH to recover after password setting
-  wait_for_connection:
-    delay: 30
-    timeout: 900
-  when: password_set.changed
 
 - name: Ensure GitLab services are running
   shell: gitlab-ctl status

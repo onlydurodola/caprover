@@ -105,12 +105,25 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          echo "[caprover]" > inventory.ini
-          echo "${{ env.CAPROVER_INSTANCE_ID }} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1 >> inventory.ini
-          echo "[gitlab]" >> inventory.ini
-          echo "${{ env.GITLAB_INSTANCE_ID }} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1 >> inventory.ini
+          # Create properly formatted inventory file
+          cat << EOF > inventory.ini
+          [caprover]
+          ${CAPROVER_INSTANCE_ID} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1
+
+          [gitlab]
+          ${GITLAB_INSTANCE_ID} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1
+          EOF
+          
+          # Verify inventory file
           echo "Inventory created:"
           cat inventory.ini
+
+      - name: Install Ansible SSM Dependencies
+        if: github.ref == 'refs/heads/main'
+        run: |
+          pip install boto3
+          ansible-galaxy collection install community.aws
+          
       - name: Install Ansible SSM Dependencies
         if: github.ref == 'refs/heads/main'
         run: |
