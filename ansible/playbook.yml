@@ -3,6 +3,9 @@
     - vault.yml
   become: true
   connection: aws_ssm
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_become_method: sudo
   roles:
     - caprover
 
@@ -11,5 +14,8 @@
     - vault.yml
   become: true
   connection: aws_ssm
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_become_method: sudo
   roles:
     - gitlab

@@ -23,6 +23,8 @@ resource "aws_instance" "caprover" {
   iam_instance_profile        = var.iam_instance_profile_name 
   user_data            = <<-EOF
                          #!/bin/bash
+                         sudo apt update
+                         sudo apt install -y python3 python3-pip
                          sudo snap install amazon-ssm-agent --classic
                          sudo systemctl enable amazon-ssm-agent
                          sudo systemctl start amazon-ssm-agent
@@ -46,6 +48,8 @@ resource "aws_instance" "gitlab" {
   iam_instance_profile        = var.iam_instance_profile_name 
   user_data            = <<-EOF
                          #!/bin/bash
+                         sudo apt update
+                         sudo apt install -y python3 python3-pip
                          sudo snap install amazon-ssm-agent --classic
                          sudo systemctl enable amazon-ssm-agent
                          sudo systemctl start amazon-ssm-agent

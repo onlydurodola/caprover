@@ -118,29 +118,24 @@ jobs:
           echo "Inventory created:"
           cat inventory.ini
 
-      - name: Install Ansible SSM Dependencies
+      - name: Install Ansible Dependencies
         if: github.ref == 'refs/heads/main'
         run: |
           pip install boto3
           ansible-galaxy collection install community.aws
-          
-      - name: Install Ansible SSM Dependencies
-        if: github.ref == 'refs/heads/main'
-        run: |
-          pip install boto3
+          ansible-galaxy collection install community.general
+          ansible-galaxy collection install community.docker
+
 
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
-          chmod 600 .vault_pass
-
           ansible-playbook -i inventory.ini playbook.yml -vv \
-            --vault-password-file .vault_pass \
+            --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
 
-          shred -zu .vault_pass
+                shred -zu .vault_pass
 
       - name: Verify  Setup
         run: |
