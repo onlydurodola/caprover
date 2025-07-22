@@ -122,8 +122,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           /opt/pipx/venvs/ansible-core/bin/python -m pip install --upgrade boto3
-          sudo pip install --no-cache-dir boto3
-          sudo ansible-galaxy collection install community.aws community.general community.docker
+          /opt/pipx/venvs/ansible-core/bin/ansible-galaxy collection install community.aws community.general community.docker
+          
       - name: Debug Python Info
         run: |
           echo "Ansible Python path: $(which ansible)"

@@ -2,10 +2,11 @@
   vars_files:
     - vault.yml
   become: true
-  connection: aws_ssm
+  connection: community.aws.aws_ssm
   vars:
     ansible_python_interpreter: /usr/bin/python3
-    ansible_become_method: sudo
+    ansible_ssm_executable: /usr/bin/session-manager-plugin
+    ansible_ssm_region: eu-north-1
   roles:
     - caprover
 
@@ -13,9 +14,10 @@
   vars_files:
     - vault.yml
   become: true
-  connection: aws_ssm
+  connection: community.aws.aws_ssm
   vars:
     ansible_python_interpreter: /usr/bin/python3
-    ansible_become_method: sudo
+    ansible_ssm_executable: /usr/bin/session-manager-plugin
+    ansible_ssm_region: eu-north-1
   roles:
     - gitlab
