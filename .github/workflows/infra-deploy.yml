@@ -97,12 +97,12 @@ jobs:
           echo "--- Installing Ansible and its dependencies ---"
           python3 -m venv /home/runner/ansible_venv
           /home/runner/ansible_venv/bin/pip install --upgrade pip
-          # Install ansible-core instead of the full ansible package
           /home/runner/ansible_venv/bin/pip install \
             ansible-core==2.16.14 \
             boto3==1.34.115 \
             botocore==1.34.115
-          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -p ./collections
+          # Install a specific, compatible version of the AWS collection
+          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws:==6.5.0 community.general community.docker -p ./collections
 
       - name: Create Ansible Configuration File
         if: github.ref == 'refs/heads/main'

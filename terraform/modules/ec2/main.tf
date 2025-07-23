@@ -69,3 +69,4 @@ resource "aws_instance" "gitlab" {
     Name = "${var.env}-gitlab"
   }
 }
+#
