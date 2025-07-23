@@ -14,10 +14,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    defaults:
-      run:
-        working-directory: terraform
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -39,6 +36,7 @@ jobs:
           audience: sts.amazonaws.com
 
       - name: Setup Terraform Variables
+        working-directory: terraform
         run: |
           echo "allowed_ips =  [\"${{ secrets.VPN_CIDR }}\"]" >> secrets.auto.tfvars
           echo "vpn_enabled = \"true\"" >> secrets.auto.tfvars
@@ -50,86 +48,55 @@ jobs:
           echo "waf_enabled = \"true\"" >> secrets.auto.tfvars
 
       - name: Terraform Init, Plan, and Apply
-        id: terraform
+        working-directory: terraform
         run: |
           terraform init -backend-config=backend.hcl -input=false -reconfigure
           terraform validate
           terraform plan -out=tfplan -input=false
           terraform apply -input=false -auto-approve tfplan
           rm -f tfplan
+
+      - name: Save Terraform Outputs
+        id: terraform_outputs
+        working-directory: terraform
+        run: |
           echo "caprover_instance_id=$(terraform output -raw caprover_instance_id)" >> $GITHUB_OUTPUT
           echo "gitlab_instance_id=$(terraform output -raw gitlab_instance_id)" >> $GITHUB_OUTPUT
           echo "vpc_cidr=$(terraform output -raw vpc_cidr)" >> $GITHUB_OUTPUT
           echo "ansible_s3_bucket=$(terraform output -raw ansible_ssm_s3_bucket_name)" >> $GITHUB_OUTPUT
 
-      - name: Wait for SSM Registration
-        if: github.ref == 'refs/heads/main'
+      - name: Install AWS dependencies
         run: |
-          echo "Waiting for SSM registration..."
-          for i in {1..15}; do
-            cap_status=$(aws ssm describe-instance-information --filters Key=InstanceIds,Values=${{ steps.terraform.outputs.caprover_instance_id }} --query 'InstanceInformationList[0].PingStatus' --output text || echo "Error")
-            git_status=$(aws ssm describe-instance-information --filters Key=InstanceIds,Values=${{ steps.terraform.outputs.gitlab_instance_id }} --query 'InstanceInformationList[0].PingStatus' --output text || echo "Error")
-            echo "CapRover status: $cap_status, GitLab status: $git_status"
-            if [[ "$cap_status" == "Online" && "$git_status" == "Online" ]]; then
-              echo "Both instances online"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "SSM registration timeout"
-          exit 1
+          pip install --upgrade pip
+          pip install -r ansible/requirements.txt
 
-      - name: Install Ansible Dependencies
-        working-directory: ansible
-        run: |
-          echo "--- Installing Ansible and its dependencies ---"
-          python3 -m venv /home/runner/ansible_venv
-          /home/runner/ansible_venv/bin/pip install --upgrade pip
-          /home/runner/ansible_venv/bin/pip install \
-            ansible-core==2.15.10 \
-            boto3 \
-            botocore
-          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws:==6.5.0 community.general community.docker -p ./collections
+      - name: Run Ansible Playbook
+        uses: dawidd6/action-ansible-playbook@v2
+        with:
+          playbook: playbook.yml
+          directory: ansible
+          requirements: requirements.yml
+          inventory: |
+            [all:vars]
+            ansible_aws_ssm_s3_bucket_name = ${{ steps.terraform_outputs.outputs.ansible_s3_bucket }}
+            ansible_aws_ssm_region = eu-north-1
+            ansible_user = ubuntu
+            ansible_python_interpreter = /usr/bin/python3
 
-      - name: Create Ansible Inventory and Config
-        working-directory: ansible
-        run: |
-          echo "--- Creating ansible.cfg ---"
-          cat << EOF > ansible.cfg
-          [defaults]
-          inventory = inventory.ini
-          host_key_checking = False
-          deprecation_warnings = False
-          [ssm_connection]
-          s3_bucket_name = ${{ steps.terraform.outputs.ansible_s3_bucket }}
-          region = eu-north-1
-          EOF
+            [caprover]
+            ${{ steps.terraform_outputs.outputs.caprover_instance_id }}
 
-          echo "--- Creating inventory.ini ---"
-          cat << EOF > inventory.ini
-          [all:vars]
-          ansible_connection = amazon.aws.aws_ssm
-          ansible_user = ubuntu
-          ansible_python_interpreter = /usr/bin/python3
-
-          [caprover]
-          ${{ steps.terraform.outputs.caprover_instance_id }}
-
-          [gitlab]
-          ${{ steps.terraform.outputs.gitlab_instance_id }}
-          EOF
-
-      - name: Run Ansible Configuration
-        working-directory: ansible
+            [gitlab]
+            ${{ steps.terraform_outputs.outputs.gitlab_instance_id }}
+          vault_password: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          options: --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ steps.terraform_outputs.outputs.vpc_cidr }} -vv"
         env:
-          ANSIBLE_COLLECTIONS_PATH: ./collections
-        run: |
-          /home/runner/ansible_venv/bin/ansible-playbook -i inventory.ini playbook.yml -vvv \
-            --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
-            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ steps.terraform.outputs.vpc_cidr }}"
-            
+          ANSIBLE_COLLECTIONS_PATH: /home/runner/.ansible/collections
+          PYTHONPATH: /usr/lib/python3/dist-packages
+          PYTHONUNBUFFERED: 1
+
       - name: Verify Application Health
-        working-directory: terraform
+        if: github.ref == 'refs/heads/main'
         run: |
           echo "Testing CapRover dashboard:"
           curl -sL --max-time 10 -o /dev/null -w "%{http_code}" "https://captain.${{ secrets.DOMAIN_NAME }}" | grep -q 200
@@ -139,22 +106,21 @@ jobs:
 
       - name: Capture Debug Info on Failure
         if: ${{ failure() }}
-        working-directory: terraform
         run: |
           echo "===== SSM AGENT STATUS ====="
           aws ssm describe-instance-information \
-            --filters Key=InstanceIds,Values=${{ steps.terraform.outputs.caprover_instance_id }} \
+            --filters Key=InstanceIds,Values=${{ steps.terraform_outputs.outputs.caprover_instance_id }} \
             --query 'InstanceInformationList[0]'
           
           aws ssm describe-instance-information \
-            --filters Key=InstanceIds,Values=${{ steps.terraform.outputs.gitlab_instance_id }} \
+            --filters Key=InstanceIds,Values=${{ steps.terraform_outputs.outputs.gitlab_instance_id }} \
             --query 'InstanceInformationList[0]'
           
           echo "===== INSTANCE SYSTEM LOGS ====="
-          aws ec2 get-console-output --instance-id ${{ steps.terraform.outputs.caprover_instance_id }} --output text
-          aws ec2 get-console-output --instance-id ${{ steps.terraform.outputs.gitlab_instance_id }} --output text
+          aws ec2 get-console-output --instance-id ${{ steps.terraform_outputs.outputs.caprover_instance_id }} --output text
+          aws ec2 get-console-output --instance-id ${{ steps.terraform_outputs.outputs.gitlab_instance_id }} --output text
           
           echo "===== ANSIBLE LOGS ====="
-          if [ -f ../ansible/ansible.log ]; then
-            cat ../ansible/ansible.log
+          if [ -f ansible/ansible.log ]; then
+            cat ansible/ansible.log
           fi
