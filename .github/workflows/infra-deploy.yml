@@ -93,6 +93,8 @@ jobs:
         env:
           ANSIBLE_COLLECTIONS_PATH: /home/runner/.ansible/collections
           PYTHONPATH: /usr/lib/python3/dist-packages
+          ANSIBLE_STDOUT_CALLBACK: debug 
+          PYTHONUNBUFFERED: 1
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'

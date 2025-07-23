@@ -1,5 +1,6 @@
 - hosts: caprover
   connection: community.aws.aws_ssm
+  gather_facts: no 
   vars_files:
     - vault.yml
   become: true
@@ -8,6 +9,7 @@
 
 - hosts: gitlab
   connection: community.aws.aws_ssm
+  gather_facts: no 
   vars_files:
     - vault.yml
   become: true
