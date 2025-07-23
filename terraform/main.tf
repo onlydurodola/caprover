@@ -101,3 +101,26 @@ module "vpn" {
   server_cert_arn   = var.server_cert_arn
   vpn_cidr          = var.vpn_cidr
 }
+
+
+resource "random_id" "bucket_suffix" {
+  byte_length = 8
+}
+
+resource "aws_s3_bucket" "ansible_ssm" {
+  # Bucket names must be globally unique. A random suffix helps.
+  bucket = "caprover-ansible-ssm-${random_id.bucket_suffix.hex}"
+
+  # A best practice to prevent accidental deletion of a production bucket
+  # Set to true for ephemeral environments if needed.
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_public_access_block" "ansible_ssm" {
+  bucket = aws_s3_bucket.ansible_ssm.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}

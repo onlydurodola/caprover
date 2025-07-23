@@ -80,6 +80,7 @@ jobs:
           VPC_CIDR=$(terraform output -raw vpc_cidr)
           CAPROVER_INSTANCE_ID=$(terraform output -raw caprover_instance_id)
           GITLAB_INSTANCE_ID=$(terraform output -raw gitlab_instance_id)
+          ANSIBLE_S3_BUCKET=$(terraform output -raw ansible_ssm_s3_bucket_name)
           
           echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
           echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
@@ -89,6 +90,7 @@ jobs:
           echo "VPC_CIDR=$VPC_CIDR" >> $GITHUB_ENV 
           echo "CAPROVER_INSTANCE_ID=$CAPROVER_INSTANCE_ID" >> $GITHUB_ENV
           echo "GITLAB_INSTANCE_ID=$GITLAB_INSTANCE_ID" >> $GITHUB_ENV
+          echo "ANSIBLE_S3_BUCKET=$ANSIBLE_S3_BUCKET" >> $GITHUB_ENV
 
       - name: Wait for SSM Registration
         if: github.ref == 'refs/heads/main'
@@ -177,13 +179,18 @@ jobs:
         working-directory: ansible
         run: |
           cat << EOF > inventory.ini
+          [all:vars]
+          ansible_aws_ssm_s3_bucket_name = "${{ env.ANSIBLE_S3_BUCKET }}"
+          ansible_aws_ssm_region = "eu-north-1"
+          ansible_connection = "amazon.aws.aws_ssm"
+
           [caprover]
-          ${{ env.CAPROVER_INSTANCE_ID }} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1
+          ${{ env.CAPROVER_INSTANCE_ID }}
 
           [gitlab]
-          ${{ env.GITLAB_INSTANCE_ID }} ansible_connection=community.aws.aws_ssm ansible_region=eu-north-1
+          ${{ env.GITLAB_INSTANCE_ID }}
           EOF
-          
+
           echo "Inventory created:"
           cat inventory.ini
 

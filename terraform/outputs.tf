@@ -32,3 +32,8 @@ output "caprover_instance_id" {
 output "gitlab_instance_id" {
   value = module.ec2.gitlab_instance_id
 }
+
+output "ansible_ssm_s3_bucket_name" {
+  value       = aws_s3_bucket.ansible_ssm.bucket
+  description = "The name of the S3 bucket for Ansible SSM."
+}
