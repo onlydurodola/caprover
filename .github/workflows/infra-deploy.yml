@@ -103,29 +103,22 @@ jobs:
             botocore
           /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws:==6.5.0 community.general community.docker -p ./collections
 
-      - name: Create Ansible Configuration File
-        if: github.ref == 'refs/heads/main'
-        working-directory: ansible
-        run: |
-          cat << EOF > ansible.cfg
-          [defaults]
-          inventory = inventory.ini
-          host_key_checking = False
-          deprecation_warnings = False
-          [ssm_connection]
-          s3_bucket_name = ${{ env.ANSIBLE_S3_BUCKET }}
-          region = eu-north-1
-          EOF
-
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
+          echo "--- Creating a comprehensive inventory file ---"
           cat << EOF > inventory.ini
           [all:vars]
           ansible_connection = amazon.aws.aws_ssm
+          ansible_aws_ssm_s3_bucket_name = ${{ env.ANSIBLE_S3_BUCKET }}
+          ansible_aws_ssm_region = eu-north-1
+          ansible_user = ubuntu
+          ansible_python_interpreter = /usr/bin/python3
+
           [caprover]
           ${{ env.CAPROVER_INSTANCE_ID }}
+
           [gitlab]
           ${{ env.GITLAB_INSTANCE_ID }}
           EOF
@@ -136,10 +129,10 @@ jobs:
         env:
           ANSIBLE_COLLECTIONS_PATH: ./collections
         run: |
-          /home/runner/ansible_venv/bin/ansible-playbook playbook.yml -vvv \
+          /home/runner/ansible_venv/bin/ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
-
+            
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'
         run: |
