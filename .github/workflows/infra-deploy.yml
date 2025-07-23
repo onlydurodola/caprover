@@ -133,9 +133,9 @@ jobs:
           sudo apt-get install -y python3-venv
           python3 -m venv /home/runner/ansible_venv
           /home/runner/ansible_venv/bin/pip install --upgrade pip
-          /home/runner/ansible_venv/bin/pip install -r ansible/requirements.txt
+          /home/runner/ansible_venv/bin/pip install -r ../ansible/requirements.txt
           /home/runner/ansible_venv/bin/ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
-          
+
       - name: Debug Python Environment
         if: github.ref == 'refs/heads/main'
         run: |
