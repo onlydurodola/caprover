@@ -87,39 +87,47 @@ jobs:
             botocore==1.34.115
           /home/runner/ansible_venv/bin/ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
 
-      - name: Prepare Ansible Command
-        id: prep_ansible
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "--- Verifying environment variables for Ansible ---"
-          echo "S3 Bucket from env is: ${{ env.ANSIBLE_S3_BUCKET }}"
-          if [ -z "${{ env.ANSIBLE_S3_BUCKET }}" ]; then
-            echo "::error::ANSIBLE_S3_BUCKET environment variable is empty. Cannot proceed."
-            exit 1
-          fi
-          VARS_STRING="domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }} ansible_connection=amazon.aws.aws_ssm ansible_aws_ssm_region=eu-north-1 ansible_aws_ssm_s3_bucket_name=${{ env.ANSIBLE_S3_BUCKET }}"
-          echo "::set-output name=ansible_vars::$VARS_STRING"
-
-      - name: Create Simplified Ansible Inventory
+      - name: Create Ansible Configuration File
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          echo "--- Creating simplified inventory file ---"
+          echo "--- Creating ansible.cfg to configure the SSM connection ---"
+          cat << EOF > ansible.cfg
+          [defaults]
+          inventory = inventory.ini
+          host_key_checking = False
+          deprecation_warnings = False
+
+          [ssm_connection]
+          s3_bucket_name = ${{ env.ANSIBLE_S3_BUCKET }}
+          region = eu-north-1
+          EOF
+          cat ansible.cfg
+
+      - name: Create Ansible Inventory
+        if: github.ref == 'refs/heads/main'
+        working-directory: ansible
+        run: |
+          echo "--- Creating inventory.ini with connection type ---"
           cat << EOF > inventory.ini
+          [all:vars]
+          ansible_connection = amazon.aws.aws_ssm
+
           [caprover]
           ${{ env.CAPROVER_INSTANCE_ID }}
 
           [gitlab]
           ${{ env.GITLAB_INSTANCE_ID }}
           EOF
+          cat inventory.ini
 
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          /home/runner/ansible_venv/bin/ansible-playbook -i inventory.ini playbook.yml -vvv \
+          /home/runner/ansible_venv/bin/ansible-playbook playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
-            --extra-vars "${{ steps.prep_ansible.outputs.ansible_vars }}"
+            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'
