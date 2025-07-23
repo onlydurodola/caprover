@@ -102,7 +102,7 @@ jobs:
             boto3==1.34.115 \
             botocore==1.34.115
           # Force collections to install locally to ensure they are found
-          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -p ./collections --force
+          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws:==6.5.0 community.general community.docker -p ./collections --force
 
       - name: Create Ansible Configuration File
         if: github.ref == 'refs/heads/main'
