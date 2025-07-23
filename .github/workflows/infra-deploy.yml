@@ -66,7 +66,9 @@ jobs:
           echo "ansible_s3_bucket=$(terraform output -raw ansible_ssm_s3_bucket_name)" >> $GITHUB_OUTPUT
 
       - name: Install AWS dependencies
-        run: pip install boto3 botocore
+        run: |
+          pip install --upgrade pip
+          pip install -r ansible/requirements.txt
 
       - name: Run Ansible Playbook
         uses: dawidd6/action-ansible-playbook@v2
@@ -90,6 +92,7 @@ jobs:
           options: --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ steps.terraform_outputs.outputs.vpc_cidr }}"
         env:
           ANSIBLE_COLLECTIONS_PATH: /home/runner/.ansible/collections
+          PYTHONPATH: /usr/lib/python3/dist-packages
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'
