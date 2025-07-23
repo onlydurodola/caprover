@@ -145,11 +145,14 @@
   ignore_errors: true
   when: not caprover_installed.stat.exists
 
+
 - name: Reset Docker Swarm if active
   shell: |
+    {% raw %}
     if docker info --format '{{ .Swarm.LocalNodeState }}' | grep -q "active"; then
       docker swarm leave --force
     fi
+    {% endraw %}
   when: not caprover_installed.stat.exists
   ignore_errors: true
   become: true

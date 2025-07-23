@@ -28,6 +28,10 @@
     creates: /usr/bin/gitlab-ctl
   when: not gitlab_installed.stat.exists
   notify: reconfigure gitlab
+  retries: 5
+  delay: 10
+  register: gitlab_install_result
+  until: gitlab_install_result.rc == 0
 
 - name: Reconfigure GitLab
   command: gitlab-ctl reconfigure
