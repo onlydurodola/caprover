@@ -66,7 +66,10 @@ jobs:
           echo "ansible_s3_bucket=$(terraform output -raw ansible_ssm_s3_bucket_name)" >> $GITHUB_OUTPUT
 
       - name: Install Python requirements
-        run: pip install -r ansible/requirements.txt
+        run: |
+          echo "boto3>=1.26.0" > ansible/requirements.txt
+          echo "botocore>=1.29.0" >> ansible/requirements.txt
+          pip install -r ansible/requirements.txt
 
       - name: Run Ansible Playbook
         uses: dawidd6/action-ansible-playbook@v2
