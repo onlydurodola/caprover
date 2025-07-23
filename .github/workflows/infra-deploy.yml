@@ -101,8 +101,12 @@ jobs:
             ansible==9.1.0 \
             boto3==1.34.115 \
             botocore==1.34.115
-          # Install collections to a local path './collections' to ensure it's found
-          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -p ./collections
+          # Install collections to a local path and add an explicit check for success
+          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -p ./collections -vvv
+          if [ ! -d "./collections/ansible_collections/amazon/aws" ]; then
+            echo "::error::Collection 'amazon.aws' was not found after installation. The galaxy command failed."
+            exit 1
+          fi
 
       - name: Create Minimal Ansible Inventory
         if: github.ref == 'refs/heads/main'
@@ -121,11 +125,9 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         env:
+          # Point ONLY to the new local collections path
           ANSIBLE_COLLECTIONS_PATH: ./collections
         run: |
-          echo "--- Verifying local collection installation ---"
-          ls -lR ./collections
-
           /home/runner/ansible_venv/bin/ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
             --extra-vars "ansible_connection=amazon.aws.aws_ssm ansible_aws_ssm_s3_bucket_name=${{ env.ANSIBLE_S3_BUCKET }} ansible_aws_ssm_region=eu-north-1 domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
