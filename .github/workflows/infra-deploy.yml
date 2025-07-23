@@ -98,7 +98,7 @@ jobs:
           python3 -m venv /home/runner/ansible_venv
           /home/runner/ansible_venv/bin/pip install --upgrade pip
           /home/runner/ansible_venv/bin/pip install \
-            ansible-core==2.16.14 \
+            ansible-core==2.15.10 \
             boto3==1.34.115 \
             botocore==1.34.115
           # Install a specific, compatible version of the AWS collection locally
