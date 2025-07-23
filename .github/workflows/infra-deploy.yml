@@ -81,13 +81,13 @@ jobs:
           CAPROVER_INSTANCE_ID=$(terraform output -raw caprover_instance_id)
           GITLAB_INSTANCE_ID=$(terraform output -raw gitlab_instance_id)
           ANSIBLE_S3_BUCKET=$(terraform output -raw ansible_ssm_s3_bucket_name)
-          
+
           echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
           echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
           echo "CAPROVER_SG_ID=$CAPROVER_SG_ID" >> $GITHUB_ENV
           echo "GITLAB_SG_ID=$GITLAB_SG_ID" >> $GITHUB_ENV
           echo "ALB_DNS=$ALB_DNS" >> $GITHUB_ENV
-          echo "VPC_CIDR=$VPC_CIDR" >> $GITHUB_ENV 
+          echo "VPC_CIDR=$VPC_CIDR" >> $GITHUB_ENV
           echo "CAPROVER_INSTANCE_ID=$CAPROVER_INSTANCE_ID" >> $GITHUB_ENV
           echo "GITLAB_INSTANCE_ID=$GITLAB_INSTANCE_ID" >> $GITHUB_ENV
           echo "ANSIBLE_S3_BUCKET=$ANSIBLE_S3_BUCKET" >> $GITHUB_ENV
@@ -190,7 +190,7 @@ jobs:
           [gitlab]
           ${{ env.GITLAB_INSTANCE_ID }}
           EOF
-
+          
           echo "Inventory created:"
           cat inventory.ini
 
