@@ -37,7 +37,7 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.ACC_ID }}:role/GitHubActionsRole
           role-session-name: GitHubActionsSession
           audience: sts.amazonaws.com
-        
+
       - name: Setup Terraform Variables
         run: |
           echo "allowed_ips =  [\"${{ secrets.VPN_CIDR }}\"]" >> secrets.auto.tfvars
@@ -50,14 +50,13 @@ jobs:
           echo "waf_enabled = \"true\"" >> secrets.auto.tfvars
 
       - name: Terraform Init
-        run: |
-          terraform init -backend-config=backend.hcl -input=false -reconfigure
-      
+        run: terraform init -backend-config=backend.hcl -input=false -reconfigure
+
       - name: Terraform Format
         run: |
           terraform fmt -recursive
           find . -name "*.tf" -exec terraform fmt -check -diff {} +
-            
+
       - name: Terraform Validate
         run: terraform validate
 
@@ -121,33 +120,29 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip pipx
-          pipx install --force ansible-core==2.14.2
-          pipx runpip ansible-core install boto3==1.34.0 botocore==1.34.0
-          pipx run --spec ansible-core ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
+          sudo apt-get install -y python3-venv
+          python3 -m venv /home/runner/ansible_venv
+          /home/runner/ansible_venv/bin/pip install ansible-core==2.14.2 boto3==1.34.0 botocore==1.34.0
+          /home/runner/ansible_venv/bin/ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
 
       - name: Debug Python Environment
         if: github.ref == 'refs/heads/main'
         run: |
-          echo "System Python version:"
-          /usr/bin/python3 --version
-          echo "System Pip version:"
-          /usr/bin/pip3 --version
-          echo "System Installed packages:"
-          /usr/bin/pip3 list
+          echo "Virtual Environment Python version:"
+          /home/runner/ansible_venv/bin/python --version
+          echo "Virtual Environment Pip version:"
+          /home/runner/ansible_venv/bin/pip --version
+          echo "Virtual Environment Installed packages:"
+          /home/runner/ansible_venv/bin/pip list
           echo "Ansible executable path:"
-          which ansible-playbook
-          echo "Pipx Ansible Python version:"
-          pipx run --spec ansible-core python --version
-          echo "Pipx Ansible Installed packages:"
-          pipx runpip --spec ansible-core list
-          pipx run --spec ansible-core python -c "import boto3; print('boto3 version:', boto3.__version__)"
-          pipx run --spec ansible-core python -c "import botocore; print('botocore version:', botocore.__version__)"
+          which /home/runner/ansible_venv/bin/ansible-playbook
+          echo "Verify boto3 installation:"
+          /home/runner/ansible_venv/bin/python -c "import boto3; print('boto3 version:', boto3.__version__)"
 
       - name: Verify Ansible Collections
         if: github.ref == 'refs/heads/main'
         run: |
-          ansible-galaxy collection list | grep -E 'community.aws|community.general|community.docker'
+          /home/runner/ansible_venv/bin/ansible-galaxy collection list | grep -E 'community.aws|community.general|community.docker'
 
       - name: Test SSM Connection
         if: github.ref == 'refs/heads/main'
@@ -185,7 +180,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          pipx run --spec ansible-core ansible-playbook -i inventory.ini playbook.yml -vvv \
+          /home/runner/ansible_venv/bin/ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}" \
             | tee ansible.log
@@ -212,7 +207,7 @@ jobs:
             --query 'InstanceInformationList[0]'
           
           echo "===== INSTANCE SYSTEM LOGS ====="
-          aws ec2 get-console-output --instance-id ${{ env.CAPROVER_INSTANCE_ID }} --output text
+          aws s ensure the virtual environment is used consistently.ec2 get-console-output --instance-id ${{ env.CAPROVER_INSTANCE_ID }} --output text
           aws ec2 get-console-output --instance-id ${{ env.GITLAB_INSTANCE_ID }} --output text
           
           echo "===== ANSIBLE LOGS ====="
