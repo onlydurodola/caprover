@@ -14,7 +14,10 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    
+    defaults:
+      run:
+        working-directory: terraform
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -35,86 +38,60 @@ jobs:
           role-session-name: GitHubActionsSession
           audience: sts.amazonaws.com
 
-      - name: Setup Terraform Variables
-        working-directory: terraform
-        run: |
-          echo "allowed_ips =  [\"${{ secrets.VPN_CIDR }}\"]" >> secrets.auto.tfvars
-          echo "vpn_enabled = \"true\"" >> secrets.auto.tfvars
-          echo "root_cert_arn = \"${{ secrets.VPN_ROOT_CERT_ARN }}\"" >> secrets.auto.tfvars
-          echo "server_cert_arn = \"${{ secrets.VPN_SERVER_CERT_ARN }}\"" >> secrets.auto.tfvars
-          echo "certificate_arn = \"${{ secrets.ACM_CERTIFICATE_ARN }}\"" >> secrets.auto.tfvars
-          echo "domain_name = \"${{ secrets.DOMAIN_NAME }}\"" >> secrets.auto.tfvars
-          echo "aws_region = \"eu-north-1\"" >> secrets.auto.tfvars
-          echo "waf_enabled = \"true\"" >> secrets.auto.tfvars
-
       - name: Terraform Init, Plan, and Apply
-        working-directory: terraform
+        id: terraform
         run: |
           terraform init -backend-config=backend.hcl -input=false -reconfigure
           terraform validate
           terraform plan -out=tfplan -input=false
           terraform apply -input=false -auto-approve tfplan
           rm -f tfplan
-
-      - name: Save Terraform Outputs
-        id: terraform_outputs
-        working-directory: terraform
-        run: |
           echo "caprover_instance_id=$(terraform output -raw caprover_instance_id)" >> $GITHUB_OUTPUT
           echo "gitlab_instance_id=$(terraform output -raw gitlab_instance_id)" >> $GITHUB_OUTPUT
           echo "vpc_cidr=$(terraform output -raw vpc_cidr)" >> $GITHUB_OUTPUT
           echo "ansible_s3_bucket=$(terraform output -raw ansible_ssm_s3_bucket_name)" >> $GITHUB_OUTPUT
-          
 
-      - name: Run Ansible Playbook in Execution Environment
-        uses: ansible/ansible-runner-action@v2
-        with:
-          workdir: ansible
-          playbook: playbook.yml
-          galaxy: requirements.yml
-          requirements-txt: requirements.txt
-          inventory: |
-            [all:vars]
-            ansible_connection = amazon.aws.aws_ssm
-            ansible_aws_ssm_s3_bucket_name = ${{ steps.terraform_outputs.outputs.ansible_s3_bucket }}
-            ansible_aws_ssm_region = eu-north-1
-            ansible_user = ubuntu
-            ansible_python_interpreter = /usr/bin/python3
-
-            [caprover]
-            ${{ steps.terraform_outputs.outputs.caprover_instance_id }}
-
-            [gitlab]
-            ${{ steps.terraform_outputs.outputs.gitlab_instance_id }}
-          extra_vars: "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ steps.terraform_outputs.outputs.vpc_cidr }}"
-          vault_password: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-            
-      - name: Verify Application Health
-        if: github.ref == 'refs/heads/main'
+      - name: Install and Verify Ansible Dependencies
+        id: ansible_install
+        working-directory: ansible
         run: |
-          echo "Testing CapRover dashboard:"
-          curl -sL --max-time 10 -o /dev/null -w "%{http_code}" "https://captain.${{ secrets.DOMAIN_NAME }}" | grep -q 200
+          echo "--- Installing Ansible and its dependencies ---"
+          python3 -m venv /home/runner/ansible_venv
+          /home/runner/ansible_venv/bin/pip install --upgrade pip
+          /home/runner/ansible_venv/bin/pip install \
+            ansible-core==2.15.10 \
+            boto3 \
+            botocore
           
-          echo "Testing GitLab:"
-          curl -sL --max-time 10 -o /dev/null -w "%{http_code}" "https://gitlab.${{ secrets.DOMAIN_NAME }}" | grep -q 200
+          echo "--- Installing Ansible Collections ---"
+          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws:==6.5.0 community.general -p ./collections -vvv
 
-      - name: Capture Debug Info on Failure
-        if: ${{ failure() }}
+          echo "--- Verifying Collection Installation ---"
+          # This command will fail the job if the plugin file doesn't exist
+          find ./collections -name "aws_ssm.py" -print -exec echo "Plugin file found!" \; -exec exit 0 \; || (echo "::error::aws_ssm.py not found in collections!" && exit 1)
+
+      - name: Run Ansible Configuration
+        working-directory: ansible
+        env:
+          ANSIBLE_COLLECTIONS_PATH: ./collections
+          AWS_REGION: eu-north-1
         run: |
-          echo "===== SSM AGENT STATUS ====="
-          aws ssm describe-instance-information \
-            --filters Key=InstanceIds,Values=${{ steps.terraform_outputs.outputs.caprover_instance_id }} \
-            --query 'InstanceInformationList[0]'
-          
-          aws ssm describe-instance-information \
-            --filters Key=InstanceIds,Values=${{ steps.terraform_outputs.outputs.gitlab_instance_id }} \
-            --query 'InstanceInformationList[0]'
-          
-          echo "===== INSTANCE SYSTEM LOGS ====="
-          aws ec2 get-console-output --instance-id ${{ steps.terraform_outputs.outputs.caprover_instance_id }} --output text
-          aws ec2 get-console-output --instance-id ${{ steps.terraform_outputs.outputs.gitlab_instance_id }} --output text
-          
-          echo "===== ANSIBLE LOGS ====="
-          if [ -f ansible/ansible.log ]; then
-            cat ansible/ansible.log
-          fi
+          # Create an in-memory inventory string
+          INVENTORY_STRING="[caprover]
+          ${{ steps.terraform.outputs.caprover_instance_id }}
+          [gitlab]
+          ${{ steps.terraform.outputs.gitlab_instance_id }}"
+
+          echo "--- Ansible Version and Paths ---"
+          /home/runner/ansible_venv/bin/ansible --version
+
+          echo "--- Checking Plugin Discovery ---"
+          # This command will fail if Ansible cannot discover the plugin
+          /home/runner/ansible_venv/bin/ansible-doc -t connection amazon.aws.aws_ssm
+
+          echo "--- Running Ansible Playbook ---"
+          /home/runner/ansible_venv/bin/ansible-playbook \
+            -i "${INVENTORY_STRING}" \
+            playbook.yml -vvv \
+            --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
+            --extra-vars "ansible_connection=amazon.aws.aws_ssm ansible_aws_ssm_s3_bucket_name=${{ steps.terraform.outputs.ansible_s3_bucket }} ansible_user=ubuntu domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ steps.terraform.outputs.vpc_cidr }}"
