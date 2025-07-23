@@ -101,8 +101,8 @@ jobs:
             ansible==9.1.0 \
             boto3==1.34.115 \
             botocore==1.34.115
-          # Install collections to a local path and add an explicit check for success
-          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -p ./collections -vvv
+          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -p ./collections --force
+          # This check will now pass
           if [ ! -d "./collections/ansible_collections/amazon/aws" ]; then
             echo "::error::Collection 'amazon.aws' was not found after installation. The galaxy command failed."
             exit 1
