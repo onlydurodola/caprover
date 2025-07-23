@@ -179,11 +179,6 @@ jobs:
         working-directory: ansible
         run: |
           cat << EOF > inventory.ini
-          [all:vars]
-          ansible_aws_ssm_s3_bucket_name = "${{ env.ANSIBLE_S3_BUCKET }}"
-          ansible_aws_ssm_region = "eu-north-1"
-          ansible_connection = "amazon.aws.aws_ssm"
-
           [caprover]
           ${{ env.CAPROVER_INSTANCE_ID }}
 
@@ -200,8 +195,7 @@ jobs:
         run: |
           /home/runner/ansible_venv/bin/ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
-            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}" \
-            | tee ansible.log
+            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }} ansible_connection=amazon.aws.aws_ssm ansible_aws_ssm_region=eu-north-1 ansible_aws_ssm_s3_bucket_name=${{ env.ANSIBLE_S3_BUCKET }}"
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'
