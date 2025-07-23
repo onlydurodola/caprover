@@ -1,12 +1,12 @@
-# - name: Debug SSM Connection
-#   command: echo "SSM connection successful"
-#   register: ssm_debug
-#   changed_when: false
+- name: Debug SSM Connection
+  command: echo "SSM connection successful"
+  register: ssm_debug
+  changed_when: false
 
-# - debug:
-#     var: ssm_debug.stdout
+- debug:
+    var: ssm_debug.stdout
 
-- name: Set Python interpreter.
+- name: Set Python interpreter
   set_fact:
     ansible_python_interpreter: /usr/bin/python3.8
 
