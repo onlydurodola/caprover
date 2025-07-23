@@ -4,4 +4,4 @@ collections:
   - name: community.general
   - name: community.docker
   - name: community.aws
-    version: 5.2.0
+    version: 9.3.0
