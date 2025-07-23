@@ -124,7 +124,7 @@ jobs:
           sudo apt-get install -y python3-pip pipx
           pipx install ansible-core==2.14.2
           pipx runpip ansible-core install boto3==1.34.0 botocore==1.34.0
-          pipx run ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
+          pipx run --spec ansible-core ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
 
       - name: Debug Python Environment
         if: github.ref == 'refs/heads/main'
