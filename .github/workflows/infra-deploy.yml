@@ -73,77 +73,72 @@ jobs:
           echo "VPC_CIDR=$(terraform output -raw vpc_cidr)" >> $GITHUB_ENV
           echo "ANSIBLE_S3_BUCKET=$(terraform output -raw ansible_ssm_s3_bucket_name)" >> $GITHUB_ENV
 
-      - name: Install Ansible Dependencies
+      - name: Wait for SSM Registration
         if: github.ref == 'refs/heads/main'
         run: |
+          echo "Waiting for SSM registration..."
+          for i in {1..15}; do
+            cap_status=$(aws ssm describe-instance-information --filters Key=InstanceIds,Values=${{ env.CAPROVER_INSTANCE_ID }} --query 'InstanceInformationList[0].PingStatus' --output text || echo "Error")
+            git_status=$(aws ssm describe-instance-information --filters Key=InstanceIds,Values=${{ env.GITLAB_INSTANCE_ID }} --query 'InstanceInformationList[0].PingStatus' --output text || echo "Error")
+            echo "CapRover status: $cap_status, GitLab status: $git_status"
+            if [[ "$cap_status" == "Online" && "$git_status" == "Online" ]]; then
+              echo "Both instances online"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "SSM registration timeout"
+          exit 1
+
+      - name: Install Ansible Dependencies
+        if: github.ref == 'refs/heads/main'
+        working-directory: ansible
+        run: |
           echo "--- Installing Ansible and its dependencies ---"
-          sudo apt-get update
-          sudo apt-get install -y python3-venv
           python3 -m venv /home/runner/ansible_venv
           /home/runner/ansible_venv/bin/pip install --upgrade pip
           /home/runner/ansible_venv/bin/pip install \
             ansible==9.1.0 \
             boto3==1.34.115 \
             botocore==1.34.115
-          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -vvv
+          # Install collections to a local path './collections' to ensure it's found
+          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -p ./collections
 
-      - name: Create Ansible Configuration File
+      - name: Create Minimal Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          echo "--- Creating ansible.cfg to configure the SSM connection ---"
-          cat << EOF > ansible.cfg
-          [defaults]
-          inventory = inventory.ini
-          host_key_checking = False
-          deprecation_warnings = False
-
-          [ssm_connection]
-          s3_bucket_name = ${{ env.ANSIBLE_S3_BUCKET }}
-          region = eu-north-1
-          EOF
-          cat ansible.cfg
-
-      - name: Create Ansible Inventory
-        if: github.ref == 'refs/heads/main'
-        working-directory: ansible
-        run: |
-          echo "--- Creating inventory.ini with connection type ---"
+          echo "--- Creating minimal inventory file ---"
           cat << EOF > inventory.ini
-          [all:vars]
-          ansible_connection = amazon.aws.aws_ssm
-
           [caprover]
           ${{ env.CAPROVER_INSTANCE_ID }}
 
           [gitlab]
           ${{ env.GITLAB_INSTANCE_ID }}
           EOF
-          cat inventory.ini
 
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         env:
-          # Explicitly setting the collection path to ensure Ansible finds the installed collections.
-          ANSIBLE_COLLECTIONS_PATH: /home/runner/.ansible/collections:/home/runner/ansible_venv/lib/python3.12/site-packages/ansible_collections
+          # Point ONLY to the new local collections path
+          ANSIBLE_COLLECTIONS_PATH: ./collections
         run: |
-          # Debug command to verify the collection is installed at the expected path
-          echo "--- Verifying collection installation path ---"
-          ls -l /home/runner/.ansible/collections/ansible_collections/
-          
+          echo "--- Verifying local collection installation ---"
+          ls -lR ./collections
+
           /home/runner/ansible_venv/bin/ansible-playbook playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
-            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
+            --extra-vars "ansible_connection=amazon.aws.aws_ssm ansible_aws_ssm_s3_bucket_name=${{ env.ANSIBLE_S3_BUCKET }} ansible_aws_ssm_region=eu-north-1 domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'
         run: |
           echo "Testing CapRover dashboard:"
-          curl -sL -o /dev/null -w "%{http_code}" "https://captain.${{ secrets.DOMAIN_NAME }}" | grep -q 200
+          curl -sL --max-time 10 -o /dev/null -w "%{http_code}" "https://captain.${{ secrets.DOMAIN_NAME }}" | grep -q 200
           
           echo "Testing GitLab:"
-          curl -sL -o /dev/null -w "%{http_code}" "https://gitlab.${{ secrets.DOMAIN_NAME }}" | grep -q 200
+          curl -sL --max-time 10 -o /dev/null -w "%{http_code}" "https://gitlab.${{ secrets.DOMAIN_NAME }}" | grep -q 200
 
       - name: Capture Debug Info on Failure
         if: ${{ failure() }}
