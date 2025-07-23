@@ -2,7 +2,6 @@
   vars_files:
     - vault.yml
   become: true
-  connection: community.aws.aws_ssm
   vars:
     ansible_python_interpreter: /usr/bin/python3
     ansible_user: ubuntu
@@ -14,11 +13,10 @@
   vars_files:
     - vault.yml
   become: true
-  connection: community.aws.aws_ssm
   vars:
     ansible_python_interpreter: /usr/bin/python3
     ansible_user: ubuntu
     ansible_ssm_region: eu-north-1
   roles:
     - gitlab
-    #
+    
