@@ -116,33 +116,33 @@ jobs:
           echo "SSM registration timeout"
           exit 1
 
-      - name: Install Ansible Dependencies
-        if: github.ref == 'refs/heads/main'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-venv
-          python3 -m venv /home/runner/ansible_venv
-          /home/runner/ansible_venv/bin/pip install ansible-core==2.14.2 boto3==1.34.0 botocore==1.34.0
-          /home/runner/ansible_venv/bin/ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
+      # - name: Install Ansible Dependencies
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y python3-venv
+      #     python3 -m venv /home/runner/ansible_venv
+      #     /home/runner/ansible_venv/bin/pip install ansible-core==2.19.0 boto3==1.34.0 botocore==1.34.0
+      #     /home/runner/ansible_venv/bin/ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
 
-      - name: Debug Python Environment
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "Virtual Environment Python version:"
-          /home/runner/ansible_venv/bin/python --version
-          echo "Virtual Environment Pip version:"
-          /home/runner/ansible_venv/bin/pip --version
-          echo "Virtual Environment Installed packages:"
-          /home/runner/ansible_venv/bin/pip list
-          echo "Ansible executable path:"
-          which /home/runner/ansible_venv/bin/ansible-playbook
-          echo "Verify boto3 installation:"
-          /home/runner/ansible_venv/bin/python -c "import boto3; print('boto3 version:', boto3.__version__)"
+      # - name: Debug Python Environment
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     echo "Virtual Environment Python version:"
+      #     /home/runner/ansible_venv/bin/python --version
+      #     echo "Virtual Environment Pip version:"
+      #     /home/runner/ansible_venv/bin/pip --version
+      #     echo "Virtual Environment Installed packages:"
+      #     /home/runner/ansible_venv/bin/pip list
+      #     echo "Ansible executable path:"
+      #     which /home/runner/ansible_venv/bin/ansible-playbook
+      #     echo "Verify boto3 installation:"
+      #     /home/runner/ansible_venv/bin/python -c "import boto3; print('boto3 version:', boto3.__version__)"
 
-      - name: Verify Ansible Collections
-        if: github.ref == 'refs/heads/main'
-        run: |
-          /home/runner/ansible_venv/bin/ansible-galaxy collection list | grep -E 'community.aws|community.general|community.docker'
+      # - name: Verify Ansible Collections
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     /home/runner/ansible_venv/bin/ansible-galaxy collection list | grep -E 'community.aws|community.general|community.docker'
 
       - name: Test SSM Connection
         if: github.ref == 'refs/heads/main'
@@ -175,6 +175,36 @@ jobs:
           
           echo "Inventory created:"
           cat inventory.ini
+
+            - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible Dependencies
+        if: github.ref == 'refs/heads/main'
+        run: |
+          python3 -m venv /home/runner/ansible_venv
+          /home/runner/ansible_venv/bin/pip install ansible-core==2.14.2 boto3==1.34.0 botocore==1.34.0
+          /home/runner/ansible_venv/bin/ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
+
+      - name: Debug Python Environment
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Virtual Environment Python version:"
+          /home/runner/ansible_venv/bin/python --version
+          echo "Virtual Environment Pip version:"
+          /home/runner/ansible_venv/bin/pip --version
+          echo "Virtual Environment Installed packages:"
+          /home/runner/ansible_venv/bin/pip list
+
+      - name: Run Ansible Configuration
+        if: github.ref == 'refs/heads/main'
+        working-directory: ansible
+        run: |
+          /home/runner/ansible_venv/bin/ansible-playbook -i inventory.ini playbook.yml -vvv \
+            --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
+            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
 
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
