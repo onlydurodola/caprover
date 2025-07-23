@@ -104,6 +104,21 @@ jobs:
           # Install a specific, compatible version of the AWS collection
           /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws:==6.5.0 community.general community.docker -p ./collections
 
+      - name: Verify Collection Installation
+        working-directory: ansible
+        run: |
+          # Check if aws_ssm plugin exists
+          find ./collections -name aws_ssm.py
+          
+          # List installed collections
+          /home/runner/ansible_venv/bin/ansible-galaxy collection list
+
+      - name: Validate SSM Connection
+        run: |
+          aws ssm start-session --target ${{ env.CAPROVER_INSTANCE_ID }} \
+            --document-name AWS-StartInteractiveCommand \
+            --parameters command="echo 'SSM connection successful'"
+
       - name: Create Ansible Configuration File
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
@@ -140,9 +155,18 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         env:
-          # Point ONLY to the new local collections path
-          ANSIBLE_COLLECTIONS_PATH: ./collections
+          # Use absolute path for collections
+          ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}/caprover/ansible/collections
+          # Required for SSM connection
+          ANSIBLE_SSH_TRANSFER_METHOD: smart
         run: |
+          # Verify collections path exists
+          echo "Collections path: $ANSIBLE_COLLECTIONS_PATH"
+          ls -lR $ANSIBLE_COLLECTIONS_PATH
+          
+          # Add collections path to Python sys.path
+          export PYTHONPATH=$ANSIBLE_COLLECTIONS_PATH:$PYTHONPATH
+          
           /home/runner/ansible_venv/bin/ansible-playbook playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
