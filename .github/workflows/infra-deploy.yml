@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     environment: production
     permissions:
       id-token: write
@@ -99,8 +99,8 @@ jobs:
           /home/runner/ansible_venv/bin/pip install --upgrade pip
           /home/runner/ansible_venv/bin/pip install \
             ansible-core==2.15.10 \
-            boto3==1.34.115 \
-            botocore==1.34.115
+            boto3 \
+            botocore
           /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws:==6.5.0 community.general community.docker -p ./collections
 
       - name: Create Ansible Configuration File
@@ -112,26 +112,22 @@ jobs:
           inventory = inventory.ini
           host_key_checking = False
           deprecation_warnings = False
-          enable_plugins = aws_ec2, aws_ssm
-          
-
           [ssm_connection]
           s3_bucket_name = ${{ env.ANSIBLE_S3_BUCKET }}
           region = eu-north-1
-          
           EOF
 
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          echo "--- Creating inventory with direct host connection settings ---"
           cat << EOF > inventory.ini
+          [all:vars]
+          ansible_connection = amazon.aws.aws_ssm
           [caprover]
-          ${{ env.CAPROVER_INSTANCE_ID }} ansible_connection=amazon.aws.aws_ssm
-
+          ${{ env.CAPROVER_INSTANCE_ID }}
           [gitlab]
-          ${{ env.GITLAB_INSTANCE_ID }} ansible_connection=amazon.aws.aws_ssm
+          ${{ env.GITLAB_INSTANCE_ID }}
           EOF
 
       - name: Run Ansible Configuration
