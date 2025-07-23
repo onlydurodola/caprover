@@ -90,7 +90,7 @@ jobs:
             [gitlab]
             ${{ steps.terraform_outputs.outputs.gitlab_instance_id }}
           vault_password: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-          options: --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ steps.terraform_outputs.outputs.vpc_cidr }} -vv"
+          options: --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ steps.terraform_outputs.outputs.vpc_cidr }} -vvvv"
         env:
           ANSIBLE_COLLECTIONS_PATH: /home/runner/.ansible/collections
           PYTHONPATH: /usr/lib/python3/dist-packages
