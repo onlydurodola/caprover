@@ -124,7 +124,14 @@ jobs:
       - name: Run Ansible Configuration
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
+        env:
+          # Explicitly setting the collection path to ensure Ansible finds the installed collections.
+          ANSIBLE_COLLECTIONS_PATH: /home/runner/.ansible/collections
         run: |
+          # Debug command to verify the collection is installed at the expected path
+          echo "--- Verifying collection installation path ---"
+          ls -l /home/runner/.ansible/collections/ansible_collections/
+          
           /home/runner/ansible_venv/bin/ansible-playbook playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
