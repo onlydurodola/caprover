@@ -107,16 +107,18 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          echo "--- Creating ansible.cfg to configure the SSM connection ---"
           cat << EOF > ansible.cfg
           [defaults]
           inventory = inventory.ini
           host_key_checking = False
           deprecation_warnings = False
+          enable_plugins = aws_ec2, aws_ssm
+          
 
           [ssm_connection]
           s3_bucket_name = ${{ env.ANSIBLE_S3_BUCKET }}
           region = eu-north-1
+          
           EOF
 
       - name: Create Ansible Inventory

@@ -265,7 +265,7 @@
   retries: 3
   delay: 10
 
-- name: Allow VPC CIDR in UFW..
+- name: Allow VPC CIDR in UFW...
   ufw:
     rule: allow
     src: "{{ vpc_cidr }}"
