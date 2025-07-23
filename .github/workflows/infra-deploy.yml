@@ -121,9 +121,10 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip
-          sudo pip3 install --no-cache-dir ansible-core==2.14.2 boto3==1.34.0 botocore==1.34.0
-          ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
+          sudo apt-get install -y python3-pip pipx
+          pipx install ansible-core==2.14.2
+          pipx runpip ansible-core install boto3==1.34.0 botocore==1.34.0
+          pipx run ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
 
       - name: Debug Python Environment
         if: github.ref == 'refs/heads/main'
@@ -136,6 +137,10 @@ jobs:
           /usr/bin/pip3 list
           echo "Ansible executable path:"
           which ansible-playbook
+          echo "Pipx Ansible Python version:"
+          pipx run --spec ansible-core python --version
+          echo "Pipx Ansible Installed packages:"
+          pipx run --spec ansible-core pip list
 
       - name: Verify Ansible Collections
         if: github.ref == 'refs/heads/main'
@@ -178,7 +183,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          ansible-playbook -i inventory.ini playbook.yml -vvv \
+          pipx run --spec ansible-core ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}" \
             | tee ansible.log
