@@ -72,112 +72,36 @@ jobs:
       - name: Save Terraform Outputs
         if: github.ref == 'refs/heads/main'
         run: |
-          CAPROVER_IP=$(terraform output -raw caprover_instance_ip)
-          GITLAB_IP=$(terraform output -raw gitlab_instance_ip)
-          CAPROVER_SG_ID=$(terraform output -raw caprover_sg_id)
-          GITLAB_SG_ID=$(terraform output -raw gitlab_sg_id)
-          ALB_DNS=$(terraform output -raw alb_dns_name)
-          VPC_CIDR=$(terraform output -raw vpc_cidr)
-          CAPROVER_INSTANCE_ID=$(terraform output -raw caprover_instance_id)
-          GITLAB_INSTANCE_ID=$(terraform output -raw gitlab_instance_id)
-          ANSIBLE_S3_BUCKET=$(terraform output -raw ansible_ssm_s3_bucket_name)
+          echo "Saving Terraform outputs to environment..."
+          echo "CAPROVER_INSTANCE_ID=$(terraform output -raw caprover_instance_id)" >> $GITHUB_ENV
+          echo "GITLAB_INSTANCE_ID=$(terraform output -raw gitlab_instance_id)" >> $GITHUB_ENV
+          echo "VPC_CIDR=$(terraform output -raw vpc_cidr)" >> $GITHUB_ENV
+          echo "ANSIBLE_S3_BUCKET=$(terraform output -raw ansible_ssm_s3_bucket_name)" >> $GITHUB_ENV
 
-          echo "CAPROVER_IP=$CAPROVER_IP" >> $GITHUB_ENV
-          echo "GITLAB_IP=$GITLAB_IP" >> $GITHUB_ENV
-          echo "CAPROVER_SG_ID=$CAPROVER_SG_ID" >> $GITHUB_ENV
-          echo "GITLAB_SG_ID=$GITLAB_SG_ID" >> $GITHUB_ENV
-          echo "ALB_DNS=$ALB_DNS" >> $GITHUB_ENV
-          echo "VPC_CIDR=$VPC_CIDR" >> $GITHUB_ENV
-          echo "CAPROVER_INSTANCE_ID=$CAPROVER_INSTANCE_ID" >> $GITHUB_ENV
-          echo "GITLAB_INSTANCE_ID=$GITLAB_INSTANCE_ID" >> $GITHUB_ENV
-          echo "ANSIBLE_S3_BUCKET=$ANSIBLE_S3_BUCKET" >> $GITHUB_ENV
-
-      - name: Wait for SSM Registration
+      - name: Prepare Ansible Command
+        id: prep_ansible
         if: github.ref == 'refs/heads/main'
         run: |
-          echo "Waiting for SSM registration..."
-          for i in {1..15}; do
-            cap_status=$(aws ssm describe-instance-information \
-              --filters Key=InstanceIds,Values=${{ env.CAPROVER_INSTANCE_ID }} \
-              --query 'InstanceInformationList[0].PingStatus' \
-              --output text)
-            
-            git_status=$(aws ssm describe-instance-information \
-              --filters Key=InstanceIds,Values=${{ env.GITLAB_INSTANCE_ID }} \
-              --query 'InstanceInformationList[0].PingStatus' \
-              --output text)
-            
-            echo "CapRover status: $cap_status, GitLab status: $git_status"
-            
-            if [[ "$cap_status" == "Online" && "$git_status" == "Online" ]]; then
-              echo "Both instances online"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "SSM registration timeout"
-          exit 1
-
-      - name: Create Ansible requirements file
-        if: github.ref == 'refs/heads/main'
-        working-directory: ansible
-        run: |
-          cat << EOF > requirements.txt
-          ansible-core==2.16.8
-          boto3==1.34.115
-          botocore==1.34.115
-          EOF
-
-      - name: Install Ansible Dependencies
-        if: github.ref == 'refs/heads/main'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-venv
-          python3 -m venv /home/runner/ansible_venv
-          /home/runner/ansible_venv/bin/pip install --upgrade pip
-          /home/runner/ansible_venv/bin/pip install -r ../ansible/requirements.txt
-          /home/runner/ansible_venv/bin/ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
-
-      - name: Debug Python Environment
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "Virtual Environment Python version:"
-          /home/runner/ansible_venv/bin/python --version
-          echo "Virtual Environment Pip version:"
-          /home/runner/ansible_venv/bin/pip --version
-          echo "Virtual Environment Installed packages:"
-          /home/runner/ansible_venv/bin/pip list
-          echo "Ansible executable path:"
-          which /home/runner/ansible_venv/bin/ansible-playbook
-          echo "Verify boto3 installation:"
-          /home/runner/ansible_venv/bin/python -c "import boto3; print('boto3 version:', boto3.__version__)"
-
-      - name: Verify Ansible Collections
-        if: github.ref == 'refs/heads/main'
-        run: |
-          /home/runner/ansible_venv/bin/ansible-galaxy collection list | grep -E 'community.aws|community.general|community.docker'
-
-      - name: Test SSM Connection
-        if: github.ref == 'refs/heads/main'
-        run: |
-          aws ssm send-command \
-            --instance-ids ${{ env.CAPROVER_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["echo SSM-TEST-SUCCESS-CAPROVER"]' \
-            --region eu-north-1 \
-            --output text
+          echo "--- Verifying environment variables for Ansible ---"
+          echo "VPC CIDR is: ${{ env.VPC_CIDR }}"
+          echo "S3 Bucket is: ${{ env.ANSIBLE_S3_BUCKET }}"
           
-          aws ssm send-command \
-            --instance-ids ${{ env.GITLAB_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["echo SSM-TEST-SUCCESS-GITLAB"]' \
-            --region eu-north-1 \
-            --output text
+          if [ -z "${{ env.ANSIBLE_S3_BUCKET }}" ]; then
+            echo "::error::ANSIBLE_S3_BUCKET environment variable is empty. Cannot proceed."
+            exit 1
+          fi
+          
+          VARS_STRING="domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }} ansible_connection=amazon.aws.aws_ssm ansible_aws_ssm_region=eu-north-1 ansible_aws_ssm_s3_bucket_name=${{ env.ANSIBLE_S3_BUCKET }}"
+          
+          echo "--- Constructed Ansible variables ---"
+          echo $VARS_STRING
+          echo "ansible_vars=$VARS_STRING" >> "$GITHUB_OUTPUT"
 
-      - name: Create Ansible Inventory
+      - name: Create Simplified Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
+          echo "--- Creating simplified inventory file ---"
           cat << EOF > inventory.ini
           [caprover]
           ${{ env.CAPROVER_INSTANCE_ID }}
@@ -185,8 +109,6 @@ jobs:
           [gitlab]
           ${{ env.GITLAB_INSTANCE_ID }}
           EOF
-          
-          echo "Inventory created:"
           cat inventory.ini
 
       - name: Run Ansible Configuration
@@ -195,34 +117,4 @@ jobs:
         run: |
           /home/runner/ansible_venv/bin/ansible-playbook -i inventory.ini playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
-            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }} ansible_connection=amazon.aws.aws_ssm ansible_aws_ssm_region=eu-north-1 ansible_aws_ssm_s3_bucket_name=${{ env.ANSIBLE_S3_BUCKET }}"
-
-      - name: Verify Application Health
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "Testing CapRover dashboard:"
-          curl -sL -o /dev/null -w "%{http_code}" "https://captain.${{ secrets.DOMAIN_NAME }}" | grep -q 200
-          
-          echo "Testing GitLab:"
-          curl -sL -o /dev/null -w "%{http_code}" "https://gitlab.${{ secrets.DOMAIN_NAME }}" | grep -q 200
-
-      - name: Capture Debug Info on Failure
-        if: ${{ failure() }}
-        run: |
-          echo "===== SSM AGENT STATUS ====="
-          aws ssm describe-instance-information \
-            --filters Key=InstanceIds,Values=${{ env.CAPROVER_INSTANCE_ID }} \
-            --query 'InstanceInformationList[0]'
-          
-          aws ssm describe-instance-information \
-            --filters Key=InstanceIds,Values=${{ env.GITLAB_INSTANCE_ID }} \
-            --query 'InstanceInformationList[0]'
-          
-          echo "===== INSTANCE SYSTEM LOGS ====="
-          aws s ensure the virtual environment is used consistently.ec2 get-console-output --instance-id ${{ env.CAPROVER_INSTANCE_ID }} --output text
-          aws ec2 get-console-output --instance-id ${{ env.GITLAB_INSTANCE_ID }} --output text
-          
-          echo "===== ANSIBLE LOGS ====="
-          if [ -f ansible.log ]; then
-            cat ansible.log
-          fi
+            --extra-vars "${{ steps.prep_ansible.outputs.ansible_vars }}"
