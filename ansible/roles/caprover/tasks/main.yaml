@@ -1,4 +1,4 @@
-- name: Debug SSM Connection.
+- name: Debug SSM Connection
   command: echo "SSM connection successful"
   register: ssm_debug
   changed_when: false
