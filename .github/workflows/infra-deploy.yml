@@ -85,7 +85,7 @@ jobs:
             ansible==9.1.0 \
             boto3==1.34.115 \
             botocore==1.34.115
-          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker
+          /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -vvv
 
       - name: Create Ansible Configuration File
         if: github.ref == 'refs/heads/main'
