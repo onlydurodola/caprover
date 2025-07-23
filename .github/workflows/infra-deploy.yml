@@ -126,7 +126,7 @@ jobs:
         working-directory: ansible
         env:
           # Explicitly setting the collection path to ensure Ansible finds the installed collections.
-          ANSIBLE_COLLECTIONS_PATH: /home/runner/.ansible/collections
+          ANSIBLE_COLLECTIONS_PATH: /home/runner/.ansible/collections:/home/runner/ansible_venv/lib/python3.12/site-packages/ansible_collections
         run: |
           # Debug command to verify the collection is installed at the expected path
           echo "--- Verifying collection installation path ---"
