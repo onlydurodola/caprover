@@ -1,17 +1,25 @@
 - hosts: caprover
   connection: community.aws.aws_ssm
-  gather_facts: no 
   vars_files:
     - vault.yml
   become: true
+  gather_facts: no  
+  pre_tasks:
+    - name: Gather minimal facts
+      setup:
+        gather_subset: min
   roles:
     - caprover
 
 - hosts: gitlab
   connection: community.aws.aws_ssm
-  gather_facts: no 
   vars_files:
     - vault.yml
   become: true
+  gather_facts: no  
+  pre_tasks:
+    - name: Gather minimal facts
+      setup:
+        gather_subset: min
   roles:
     - gitlab
