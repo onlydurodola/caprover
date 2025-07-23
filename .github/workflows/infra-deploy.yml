@@ -122,19 +122,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip pipx
-          pipx install ansible-core==2.14.2
+          pipx install --force ansible-core==2.14.2
           pipx runpip ansible-core install boto3==1.34.0 botocore==1.34.0
           pipx run --spec ansible-core ansible-galaxy collection install community.aws:>=6.0.0 community.general community.docker
-
-      - name: Verify boto3 Installation
-        if: github.ref == 'refs/heads/main'
-        run: |
-          pipx run --spec ansible-core python -c "import boto3; print('boto3 version:', boto3.__version__)"
-
-      - name: Verify botocore Installation
-        if: github.ref == 'refs/heads/main'
-        run: |
-          pipx run --spec ansible-core python -c "import botocore; print('botocore version:', botocore.__version__)"
 
       - name: Debug Python Environment
         if: github.ref == 'refs/heads/main'
@@ -150,7 +140,9 @@ jobs:
           echo "Pipx Ansible Python version:"
           pipx run --spec ansible-core python --version
           echo "Pipx Ansible Installed packages:"
-          pipx runpip --spec ansible-core pip list
+          pipx runpip --spec ansible-core list
+          pipx run --spec ansible-core python -c "import boto3; print('boto3 version:', boto3.__version__)"
+          pipx run --spec ansible-core python -c "import botocore; print('botocore version:', botocore.__version__)"
 
       - name: Verify Ansible Collections
         if: github.ref == 'refs/heads/main'
