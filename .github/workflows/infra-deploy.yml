@@ -101,19 +101,34 @@ jobs:
             ansible==9.1.0 \
             boto3==1.34.115 \
             botocore==1.34.115
+          # Force collections to install locally to ensure they are found
           /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws community.general community.docker -p ./collections --force
-          # This check will now pass
-          if [ ! -d "./collections/ansible_collections/amazon/aws" ]; then
-            echo "::error::Collection 'amazon.aws' was not found after installation. The galaxy command failed."
-            exit 1
-          fi
 
-      - name: Create Minimal Ansible Inventory
+      - name: Create Ansible Configuration File
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
-          echo "--- Creating minimal inventory file ---"
+          echo "--- Creating ansible.cfg to configure the SSM connection ---"
+          cat << EOF > ansible.cfg
+          [defaults]
+          inventory = inventory.ini
+          host_key_checking = False
+          deprecation_warnings = False
+
+          [ssm_connection]
+          s3_bucket_name = ${{ env.ANSIBLE_S3_BUCKET }}
+          region = eu-north-1
+          EOF
+
+      - name: Create Ansible Inventory
+        if: github.ref == 'refs/heads/main'
+        working-directory: ansible
+        run: |
+          echo "--- Creating inventory.ini with connection type ---"
           cat << EOF > inventory.ini
+          [all:vars]
+          ansible_connection = amazon.aws.aws_ssm
+
           [caprover]
           ${{ env.CAPROVER_INSTANCE_ID }}
 
@@ -128,9 +143,9 @@ jobs:
           # Point ONLY to the new local collections path
           ANSIBLE_COLLECTIONS_PATH: ./collections
         run: |
-          /home/runner/ansible_venv/bin/ansible-playbook -i inventory.ini playbook.yml -vvv \
+          /home/runner/ansible_venv/bin/ansible-playbook playbook.yml -vvv \
             --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
-            --extra-vars "ansible_connection=amazon.aws.aws_ssm ansible_aws_ssm_s3_bucket_name=${{ env.ANSIBLE_S3_BUCKET }} ansible_aws_ssm_region=eu-north-1 domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
+            --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ env.VPC_CIDR }}"
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'
