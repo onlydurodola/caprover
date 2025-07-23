@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     environment: production
     permissions:
       id-token: write
@@ -106,19 +106,20 @@ jobs:
             ansible-core==2.15.10 \
             boto3==1.34.115 \
             botocore==1.34.115
-          # Diagnostic Step: Check for broken Python dependencies
-          /home/runner/ansible_venv/bin/pip check
+          # Install a specific, compatible version of the AWS collection locally
           /home/runner/ansible_venv/bin/ansible-galaxy collection install amazon.aws:==6.5.0 community.general community.docker -p ./collections
 
       - name: Create Ansible Configuration File
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
+          echo "--- Creating ansible.cfg to configure the SSM connection ---"
           cat << EOF > ansible.cfg
           [defaults]
           inventory = inventory.ini
           host_key_checking = False
           deprecation_warnings = False
+
           [ssm_connection]
           s3_bucket_name = ${{ env.ANSIBLE_S3_BUCKET }}
           region = eu-north-1
@@ -128,11 +129,14 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
+          echo "--- Creating inventory.ini with connection type ---"
           cat << EOF > inventory.ini
           [all:vars]
           ansible_connection = amazon.aws.aws_ssm
+
           [caprover]
           ${{ env.CAPROVER_INSTANCE_ID }}
+
           [gitlab]
           ${{ env.GITLAB_INSTANCE_ID }}
           EOF
@@ -141,6 +145,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         env:
+          # Point ONLY to the new local collections path
           ANSIBLE_COLLECTIONS_PATH: ./collections
         run: |
           /home/runner/ansible_venv/bin/ansible-playbook playbook.yml -vvvvvv \
@@ -149,8 +154,30 @@ jobs:
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'
-        # ... your health check steps ...
+        run: |
+          echo "Testing CapRover dashboard:"
+          curl -sL --max-time 10 -o /dev/null -w "%{http_code}" "https://captain.${{ secrets.DOMAIN_NAME }}" | grep -q 200
+          
+          echo "Testing GitLab:"
+          curl -sL --max-time 10 -o /dev/null -w "%{http_code}" "https://gitlab.${{ secrets.DOMAIN_NAME }}" | grep -q 200
 
       - name: Capture Debug Info on Failure
         if: ${{ failure() }}
-        # ... your failure debug steps ...
+        run: |
+          echo "===== SSM AGENT STATUS ====="
+          aws ssm describe-instance-information \
+            --filters Key=InstanceIds,Values=${{ env.CAPROVER_INSTANCE_ID }} \
+            --query 'InstanceInformationList[0]'
+          
+          aws ssm describe-instance-information \
+            --filters Key=InstanceIds,Values=${{ env.GITLAB_INSTANCE_ID }} \
+            --query 'InstanceInformationList[0]'
+          
+          echo "===== INSTANCE SYSTEM LOGS ====="
+          aws ec2 get-console-output --instance-id ${{ env.CAPROVER_INSTANCE_ID }} --output text
+          aws ec2 get-console-output --instance-id ${{ env.GITLAB_INSTANCE_ID }} --output text
+          
+          echo "===== ANSIBLE LOGS ====="
+          if [ -f ansible/ansible.log ]; then
+            cat ansible/ansible.log
+          fi
