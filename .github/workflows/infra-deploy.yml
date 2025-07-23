@@ -94,6 +94,7 @@ jobs:
           ANSIBLE_COLLECTIONS_PATH: /home/runner/.ansible/collections
           PYTHONPATH: /usr/lib/python3/dist-packages
           PYTHONUNBUFFERED: 1
+          ANSIBLE_FORCE_COLOR: 1
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'

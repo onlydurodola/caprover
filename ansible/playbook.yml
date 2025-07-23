@@ -3,11 +3,11 @@
   vars_files:
     - vault.yml
   become: true
-  gather_facts: no  
-  pre_tasks:
-    - name: Gather minimal facts
-      setup:
-        gather_subset: min
+  gather_facts: no
+  vars:
+    ansible_distribution: Ubuntu
+    ansible_os_family: Debian
+    ansible_python_interpreter: /usr/bin/python3
   roles:
     - caprover
 
@@ -16,10 +16,10 @@
   vars_files:
     - vault.yml
   become: true
-  gather_facts: no  
-  pre_tasks:
-    - name: Gather minimal facts
-      setup:
-        gather_subset: min
+  gather_facts: no
+  vars:
+    ansible_distribution: Ubuntu
+    ansible_os_family: Debian
+    ansible_python_interpreter: /usr/bin/python3
   roles:
     - gitlab
