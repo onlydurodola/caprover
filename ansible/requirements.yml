@@ -3,3 +3,5 @@ collections:
     version: 6.5.0
   - name: community.general
   - name: community.docker
+  - name: community.aws
+    version: 5.2.0
