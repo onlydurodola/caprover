@@ -3,7 +3,6 @@
   vars_files:
     - vault.yml
   become: true
-  gather_facts: no
   vars:
     ansible_distribution: Ubuntu
     ansible_os_family: Debian
@@ -17,7 +16,6 @@
   vars_files:
     - vault.yml
   become: true
-  gather_facts: no
   vars:
     ansible_distribution: Ubuntu
     ansible_os_family: Debian
