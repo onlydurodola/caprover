@@ -10,7 +10,6 @@
   set_fact:
     ansible_python_interpreter: /usr/bin/python3.8
 
-
 - name: Check if CapRover is already installed
   stat:
     path: /captain/data/config-captain.json
@@ -123,7 +122,8 @@
 
 - name: Enable UFW (if not enabled)
   shell: |
-    if ufw status | grep -q 'Status: active'; then
+    if ufw status | grep -q 'Status: active';
+    then
       echo "UFW already enabled"
     else
       ufw --force enable
@@ -132,86 +132,49 @@
     executable: /bin/bash
   when: ansible_os_family == "Debian"
 
-- name: Clean up stale CapRover containers
-  command: docker rm -f caprover
+- name: Leave existing swarm to ensure a clean state
+  command: docker swarm leave --force
   ignore_errors: true
   become: true
   when: not caprover_installed.stat.exists
 
-- name: Check if port 2377 is available
-  command: netstat -tulnp | grep :2377
-  register: port_check
-  failed_when: port_check.rc == 0
-  ignore_errors: true
-  when: not caprover_installed.stat.exists
-
-
-- name: Reset Docker Swarm if active
-  shell: |
-    {% raw %}
-    if docker info --format '{{ .Swarm.LocalNodeState }}' | grep -q "active"; then
-      docker swarm leave --force
-    fi
-    {% endraw %}
-  when: not caprover_installed.stat.exists
-  ignore_errors: true
-  become: true
-
-- name: Free up port 2377
-  shell: |
-    if sudo ss -tulnp | grep ':2377' | grep -q dockerd; then
-      echo "Stopping Docker to free port 2377..."
-      sudo systemctl stop docker.socket docker.service
-      sleep 5
-    fi
-    sudo ss -tulnp | grep ':2377' | awk '{print $7}' | cut -d\" -f2 | xargs -r kill
-    sleep 2
+- name: Initialize Docker Swarm with the instance's private IP
+  command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
   become: true
   when: not caprover_installed.stat.exists
 
-- name: Restart Docker if stopped
-  systemd:
-    name: docker
-    state: started
-    enabled: true
+- name: Create CapRover data directory
+  file:
+    path: /captain/data
+    state: directory
+    mode: '0755'
+  become: true
   when: not caprover_installed.stat.exists
 
-- name: Run CapRover in debug mode
+- name: Configure CapRover to use the existing swarm
+  copy:
+    content: '{"useExistingSwarm": "true"}'
+    dest: /captain/data/config-override.json
+  become: true
+  when: not caprover_installed.stat.exists
+
+- name: Run CapRover container
   docker_container:
-    name: caprover-debug
+    name: caprover
     image: caprover/caprover
     ports:
       - "80:80"
       - "443:443"
       - "3000:3000"
-      - "996:996"
-      - "7946:7946"
-      - "7946:7946/udp"
-      - "4789:4789/udp"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /captain:/captain
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
-      CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
-      CAPROVER_ROOT_URL: "http://captain.{{ domain_name }}"
-      ACCEPTED_TERMS: "true"
-      MAIN_NODE_IP_ADDRESS: "{{ ansible_host }}"
-      BY_PASS_PROXY_CHECK: 'TRUE'
     restart_policy: always
     state: started
-  register: caprover_run
-  ignore_errors: true
-
-- name: Capture CapRover logs
-  command: docker logs caprover-debug
-  register: caprover_logs
-  ignore_errors: true
   become: true
-
-- debug:
-    var: caprover_logs.stdout_lines
-  when: caprover_run is failed or caprover_logs.stdout != ""
+  when: not caprover_installed.stat.exists
 
 - name: Verify CapRover API health
   uri:
@@ -219,25 +182,9 @@
     status_code: 200
   register: result
   until: result.status == 200
-  retries: 10
-  delay: 10
+  retries: 15
+  delay: 20
   when: not caprover_installed.stat.exists
-
-- name: Check Docker container status
-  shell: docker ps -a
-  register: docker_ps
-  ignore_errors: true
-
-- name: Check CapRover logs
-  shell: docker logs caprover-debug
-  register: caprover_logs
-  ignore_errors: true
-
-- debug:
-    var: docker_ps.stdout
-
-- debug:
-    var: caprover_logs.stdout
 
 - name: Install CapRover CLI (if needed)
   npm:
@@ -246,30 +193,21 @@
     state: present
   when: not caprover_installed.stat.exists
 
-- name: Configure CapRover dashboard
-  command: caprover serversetup --caproverUrl https://captain.{{ domain_name }}
-  args:
-    creates: /captain/data/config-captain.json
+- name: Login to CapRover to complete setup
+  command: >
+    caprover login
+    --caproverUrl http://localhost:3000
+    --caproverPassword "{{ vault_caprover_password }}"
+  changed_when: true
   when: not caprover_installed.stat.exists
 
-- name: Verify CapRover health
-  shell: |
-    for i in {1..30}; do
-      if curl -sIf http://localhost:3000 >/dev/null; then
-        exit 0
-      fi
-      sleep 10
-    done
-    exit 1
-  args:
-    executable: /bin/bash
-  register: health_check
-  until: health_check.rc == 0
-  retries: 3
-  delay: 10
-
-- name: Allow VPC CIDR in UFW
-  ufw:
-    rule: allow
-    src: "{{ vpc_cidr }}"
-  changed_when: false
+- name: Update default CapRover domain
+  command: >
+    caprover api
+    --caproverUrl http://localhost:3000
+    --caproverPassword "{{ vault_caprover_password }}"
+    --method POST
+    --path /user/system/changerootdomain/
+    --data '{"rootDomain":"captain.{{ domain_name }}"}'
+  changed_when: true
+  when: not caprover_installed.stat.exists

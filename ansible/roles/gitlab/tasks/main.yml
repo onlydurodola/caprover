@@ -89,6 +89,9 @@
     marker: "# {mark} ANSIBLE MANAGED BLOCK - PROXY SETTINGS"
   notify: reconfigure gitlab
 
+- name: Flush handlers to apply GitLab configuration
+  meta: flush_handlers
+
 - name: Configure DNS resolvers
   blockinfile:
     path: /etc/systemd/resolved.conf
