@@ -87,3 +87,33 @@ jobs:
             ${{ steps.terraform_outputs.outputs.gitlab_instance_id }}
           extra_vars: "domain_name=${{ secrets.DOMAIN_NAME }} vpc_cidr=${{ steps.terraform_outputs.outputs.vpc_cidr }}"
           vault_password: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+            
+      - name: Verify Application Health
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Testing CapRover dashboard:"
+          curl -sL --max-time 10 -o /dev/null -w "%{http_code}" "https://captain.${{ secrets.DOMAIN_NAME }}" | grep -q 200
+          
+          echo "Testing GitLab:"
+          curl -sL --max-time 10 -o /dev/null -w "%{http_code}" "https://gitlab.${{ secrets.DOMAIN_NAME }}" | grep -q 200
+
+      - name: Capture Debug Info on Failure
+        if: ${{ failure() }}
+        run: |
+          echo "===== SSM AGENT STATUS ====="
+          aws ssm describe-instance-information \
+            --filters Key=InstanceIds,Values=${{ steps.terraform_outputs.outputs.caprover_instance_id }} \
+            --query 'InstanceInformationList[0]'
+          
+          aws ssm describe-instance-information \
+            --filters Key=InstanceIds,Values=${{ steps.terraform_outputs.outputs.gitlab_instance_id }} \
+            --query 'InstanceInformationList[0]'
+          
+          echo "===== INSTANCE SYSTEM LOGS ====="
+          aws ec2 get-console-output --instance-id ${{ steps.terraform_outputs.outputs.caprover_instance_id }} --output text
+          aws ec2 get-console-output --instance-id ${{ steps.terraform_outputs.outputs.gitlab_instance_id }} --output text
+          
+          echo "===== ANSIBLE LOGS ====="
+          if [ -f ansible/ansible.log ]; then
+            cat ansible/ansible.log
+          fi
