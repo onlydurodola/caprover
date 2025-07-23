@@ -112,22 +112,26 @@ jobs:
           inventory = inventory.ini
           host_key_checking = False
           deprecation_warnings = False
+          enable_plugins = aws_ec2, aws_ssm
+          stdout_callback = debug
+
           [ssm_connection]
           s3_bucket_name = ${{ env.ANSIBLE_S3_BUCKET }}
           region = eu-north-1
+          
           EOF
 
       - name: Create Ansible Inventory
         if: github.ref == 'refs/heads/main'
         working-directory: ansible
         run: |
+          echo "--- Creating inventory with direct host connection settings ---"
           cat << EOF > inventory.ini
-          [all:vars]
-          ansible_connection = amazon.aws.aws_ssm
           [caprover]
-          ${{ env.CAPROVER_INSTANCE_ID }}
+          ${{ env.CAPROVER_INSTANCE_ID }} ansible_connection=amazon.aws.aws_ssm
+
           [gitlab]
-          ${{ env.GITLAB_INSTANCE_ID }}
+          ${{ env.GITLAB_INSTANCE_ID }} ansible_connection=amazon.aws.aws_ssm
           EOF
 
       - name: Run Ansible Configuration
