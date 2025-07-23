@@ -64,9 +64,10 @@ jobs:
           echo "gitlab_instance_id=$(terraform output -raw gitlab_instance_id)" >> $GITHUB_OUTPUT
           echo "vpc_cidr=$(terraform output -raw vpc_cidr)" >> $GITHUB_OUTPUT
           echo "ansible_s3_bucket=$(terraform output -raw ansible_ssm_s3_bucket_name)" >> $GITHUB_OUTPUT
+          
 
       - name: Run Ansible Playbook in Execution Environment
-        uses: redhat-actions/ansible-playbook@v2
+        uses: ansible/ansible-runner-action@v2
         with:
           workdir: ansible
           playbook: playbook.yml
