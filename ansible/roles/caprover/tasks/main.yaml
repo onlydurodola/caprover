@@ -1,3 +1,4 @@
+# caprover/ansible/roles/caprover/tasks/main.yaml
 ---
 - name: Validate required variables
   fail:
@@ -164,18 +165,32 @@
   setup:
     gather_subset: network
 
+# Fixed Docker Swarm tasks below
 - name: Check Docker Swarm state
-  command: docker info --format '{{ .Swarm.LocalNodeState }}'
+  shell: |
+    docker info --format '{{ "{{" }}.Swarm.LocalNodeState{{ "}}" }}'
   register: swarm_state
   changed_when: false
   ignore_errors: true
 
+- name: Debug Swarm state
+  debug:
+    var: swarm_state
+
 - name: Initialize Docker Swarm if not active
   command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
-  when: swarm_state.stdout != 'active'
+  when: >
+    (swarm_state is not failed) and
+    (swarm_state.stdout | trim != 'active')
   register: swarm_init
   failed_when: >
-    swarm_init.rc != 0 and 'already part of a swarm' not in swarm_init.stderr
+    swarm_init.rc != 0 and
+    'already part of a swarm' not in swarm_init.stderr
+
+- name: Handle Swarm initialization failure
+  fail:
+    msg: "Failed to initialize Docker Swarm: {{ swarm_init.stderr }}"
+  when: swarm_init is failed
 
 - name: Create CapRover data directory
   file:
