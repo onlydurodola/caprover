@@ -1,3 +1,4 @@
+# caprover/ansible/roles/caprover/tasks/main.yaml
 ---
 - name: Debug SSM Connection
   command: echo "SSM connection successful"
@@ -129,24 +130,6 @@
   setup:
     gather_subset: network
 
-- name: Leave existing swarm if active
-  command: docker swarm leave --force
-  ignore_errors: yes
-
-- name: Check Docker Swarm state
-  command: docker info --format "{{ '{{' }}.Swarm.LocalNodeState{{ '}}' }}"
-  register: swarm_state
-  changed_when: false
-  ignore_errors: true
-
-- name: Initialize Docker Swarm
-  command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
-  when: swarm_state.stdout != 'active'
-  register: swarm_init
-  failed_when: >
-    swarm_init.rc != 0 and
-    'already part of a swarm' not in swarm_init.stderr
-
 - name: Create CapRover data directory
   file:
     path: /captain/data
@@ -159,28 +142,14 @@
     dest: /captain/data/config-override.json
     mode: '0644'
 
-- name: Ensure CapRover service is running
-  community.docker.docker_swarm_service:
-    name: caprover
-    image: caprover/caprover
-    state: present
-    publish:
-      - published_port: 80
-        target_port: 80
-      - published_port: 443
-        target_port: 443
-      - published_port: 3000
-        target_port: 3000
-    mounts:
-      - source: /var/run/docker.sock
-        target: /var/run/docker.sock
-        type: bind
-      - source: /captain
-        target: /captain
-        type: bind
-    env:
-      CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
-      MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
+- name: Install CapRover using official installer
+  shell: |
+    curl -fsSL https://get.caprover.com | bash -s -- --caprover-root /captain
+  args:
+    creates: /captain/data/config-captain.json
+  environment:
+    CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
+    MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
 
 - name: Verify CapRover API health
   uri:
