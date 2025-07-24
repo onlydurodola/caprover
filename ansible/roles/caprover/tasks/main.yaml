@@ -1,3 +1,7 @@
+- name: Verify SSM connectivity
+  wait_for_connection:
+    timeout: 120
+
 - name: Check if CapRover is already installed
   stat:
     path: /captain/data/config-captain.json
@@ -32,6 +36,8 @@
     name: ubuntu
     groups: docker
     append: yes
+  become: true
+  when: not caprover_installed.stat.exists
 
 - name: Configure and enable UFW
   ufw:
@@ -60,7 +66,10 @@
   command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
   when: swarm_state.stdout | trim != 'active'
   become: true
-
+  register: swarm_init
+  changed_when: swarm_init.rc == 0
+  failed_when: swarm_init.rc != 0 and "already part of a swarm" not in swarm_init.stderr
+  
 - name: Create CapRover data directory
   file:
     path: /captain/data
@@ -97,7 +106,7 @@
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       ACCEPTED_TERMS: "true"
-    restart_config:  # ADD THIS SECTION
+    restart_config:  
       condition: on-failure
       delay: 10s
       max_attempts: 5

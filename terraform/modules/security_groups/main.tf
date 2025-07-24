@@ -241,16 +241,16 @@ resource "aws_security_group_rule" "ssm_ingress" {
   from_port         = 443
   to_port           = 443
   protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]  # SSM uses AWS endpoints
+  cidr_blocks       = [var.vpc_cidr] 
 }
 
-resource "aws_security_group_rule" "ssm_egress" {
-  security_group_id = aws_security_group.caprover.id
-  type              = "egress"
-  description       = "SSM access"
+resource "aws_security_group_rule" "gitlab_ssm_ingress" {
+  security_group_id = aws_security_group.gitlab.id
+  type              = "ingress"
+  description       = "SSM access via VPC endpoints"
   from_port         = 443
   to_port           = 443
   protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
+  cidr_blocks       = [var.vpc_cidr]  
 }
 

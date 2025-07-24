@@ -23,7 +23,7 @@ resource "aws_lb_target_group" "caprover_http" {
   vpc_id   = var.vpc_id
 
   health_check {
-    path                = "/"
+    path                = "/api/health"
     interval            = 30
     timeout             = 5
     healthy_threshold   = 2
@@ -95,6 +95,7 @@ resource "aws_lb_target_group_attachment" "caprover_http" {
   target_group_arn = aws_lb_target_group.caprover_http.arn
   target_id        = var.caprover_instance_id
   port             = 80
+  depends_on       = [aws_instance.caprover]
   
 }
 
@@ -221,7 +222,7 @@ resource "aws_lb_listener_rule" "main_domain" {
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.caprover_https.arn
+    target_group_arn = aws_lb_target_group.caprover_http.arn
   }
 
   condition {

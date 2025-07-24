@@ -8,6 +8,10 @@
     ansible_os_family: Debian
     ansible_python_interpreter: /usr/bin/python3
     ansible_remote_tmp: /tmp/ansible-$USER
+  tasks:
+    - name: Pre-run connectivity check
+      wait_for_connection:
+        timeout: 120
   roles:
     - caprover
 
@@ -21,5 +25,9 @@
     ansible_os_family: Debian
     ansible_python_interpreter: /usr/bin/python3
     ansible_remote_tmp: /tmp/ansible-$USER
+  tasks:
+    - name: Pre-run connectivity check
+      wait_for_connection:
+        timeout: 120
   roles:
     - gitlab
