@@ -68,6 +68,7 @@ jobs:
       - name: Install AWS dependencies
         run: |
           pip install --upgrade pip
+          pip install docker ansible-core
           pip install -r ansible/requirements.txt
 
       - name: Run Ansible Playbook

@@ -1,5 +1,12 @@
-# caprover/ansible/roles/caprover/tasks/main.yaml
 ---
+- name: Validate required variables
+  fail:
+    msg: "{{ item }} is not defined"
+  when: "{{ item }} is not defined"
+  loop:
+    - vault_caprover_password
+    - ansible_default_ipv4.address
+
 - name: Debug SSM Connection
   command: echo "SSM connection successful"
   register: ssm_debug
@@ -31,11 +38,17 @@
     update_cache: true
   when: not caprover_installed.stat.exists
 
+- name: Add Node.js GPG key (if needed)
+  apt_key:
+    url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+    state: present
+  when: not caprover_installed.stat.exists
+
 - name: Add Node.js repository (if needed)
-  shell: |
-    curl -sL https://deb.nodesource.com/setup_18.x | bash -
-  args:
-    creates: /etc/apt/sources.list.d/nodesource.list
+  apt_repository:
+    repo: "deb https://deb.nodesource.com/node_18.x {{ ansible_distribution_release }} main"
+    state: present
+    filename: nodesource
   when: not caprover_installed.stat.exists
 
 - name: Install Node.js (if needed)
@@ -57,19 +70,16 @@
     url: https://download.docker.com/linux/ubuntu/gpg
     dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
-    validate_certs: no
   when: not caprover_installed.stat.exists
 
-- name: Add Docker repository with key verification
-  shell: |
-    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] \
-    https://download.docker.com/linux/ubuntu \
-    {{ ansible_distribution_release }} stable" > /etc/apt/sources.list.d/docker.list
-  args:
-    creates: /etc/apt/sources.list.d/docker.list
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
   when: not caprover_installed.stat.exists
 
-- name: Force update APT cache
+- name: Update APT cache
   apt:
     update_cache: true
   when: not caprover_installed.stat.exists
@@ -85,11 +95,11 @@
   when: not caprover_installed.stat.exists
   notify: restart docker
 
-- name: Install Docker Compose (if needed)
-  get_url:
-    url: https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-Linux-x86_64
-    dest: /usr/local/bin/docker-compose
-    mode: '0755'
+- name: Install Docker Compose via pip (if needed)
+  pip:
+    name: docker-compose
+    state: present
+    executable: pip3
   when: not caprover_installed.stat.exists
 
 - name: Ensure Docker is running
@@ -98,11 +108,26 @@
     state: started
     enabled: true
 
-- name: Add ubuntu user to docker group
+- name: Ensure ubuntu user is in docker group
   user:
     name: ubuntu
     groups: docker
     append: yes
+
+- name: Check if ubuntu user has docker group membership
+  shell: groups ubuntu | grep -q docker
+  register: docker_group_check
+  changed_when: false
+  failed_when: docker_group_check.rc != 0
+  ignore_errors: true
+
+- name: Refresh docker group membership if needed
+  shell: newgrp docker
+  args:
+    warn: false
+  become_user: ubuntu
+  changed_when: false
+  when: docker_group_check.rc != 0
 
 - name: Configure UFW ports (idempotent)
   ufw:
@@ -119,16 +144,38 @@
     - { port: 4789, proto: udp }
     - { port: 2377, proto: tcp }
     - { port: 22, proto: tcp }
-  when: ansible_os_family == "Debian"
+  when: ansible_os_family in ["Debian", "Ubuntu"]
 
 - name: Enable UFW (idempotent)
   ufw:
     state: enabled
-  when: ansible_os_family == "Debian"
+  when: ansible_os_family in ["Debian", "Ubuntu"]
+
+- name: Debug UFW status
+  command: ufw status
+  register: ufw_status
+  changed_when: false
+
+- name: Debug UFW status output
+  debug:
+    var: ufw_status.stdout_lines
 
 - name: Gather facts to get private IP
   setup:
     gather_subset: network
+
+- name: Check Docker Swarm state
+  command: docker info --format '{{ .Swarm.LocalNodeState }}'
+  register: swarm_state
+  changed_when: false
+  ignore_errors: true
+
+- name: Initialize Docker Swarm if not active
+  command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
+  when: swarm_state.stdout != 'active'
+  register: swarm_init
+  failed_when: >
+    swarm_init.rc != 0 and 'already part of a swarm' not in swarm_init.stderr
 
 - name: Create CapRover data directory
   file:
@@ -142,14 +189,52 @@
     dest: /captain/data/config-override.json
     mode: '0644'
 
-- name: Install CapRover using official installer
+- name: Install and start CapRover service
   shell: |
-    curl -fsSL https://get.caprover.com | bash -s -- --caprover-root /captain
+    curl -fsSL https://get.caprover.com | bash -s -- --caprover-root /captain > /tmp/caprover_install.log 2>&1
+    if ! docker service inspect caprover &>/dev/null; then
+      docker service create \
+        --name caprover \
+        --publish 80:80 \
+        --publish 443:443 \
+        --publish 3000:3000 \
+        --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+        --mount type=bind,source=/captain,target=/captain \
+        --env MAIN_NODE_IP_ADDRESS={{ ansible_default_ipv4.address }} \
+        --env CAPROVER_ROOT_PASSWORD={{ vault_caprover_password }} \
+        caprover/caprover
+    fi
   args:
-    creates: /captain/data/config-captain.json
+    executable: /bin/bash
   environment:
-    CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
-    MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
+    HOME: /home/ubuntu
+  register: caprover_install
+  failed_when: caprover_install.rc != 0
+
+- name: Debug CapRover installer output
+  debug:
+    var: caprover_install.stdout_lines
+  when: caprover_install.changed
+
+- name: Check CapRover service status
+  command: docker service ls --filter name=caprover
+  register: caprover_service_status
+  changed_when: false
+
+- name: Debug CapRover service status
+  debug:
+    var: caprover_service_status.stdout_lines
+
+- name: Check CapRover service logs
+  command: docker service logs caprover_caprover --tail 50
+  register: caprover_logs
+  ignore_errors: true
+  changed_when: false
+
+- name: Debug CapRover service logs
+  debug:
+    var: caprover_logs.stdout_lines
+  when: caprover_logs.rc == 0
 
 - name: Verify CapRover API health
   uri:
@@ -157,5 +242,5 @@
     status_code: 200
   register: result
   until: result.status == 200
-  retries: 15
-  delay: 20
+  retries: 30
+  delay: 30
