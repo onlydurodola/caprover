@@ -1,4 +1,3 @@
----
 - name: Debug SSM Connection
   command: echo "SSM connection successful"
   register: ssm_debug
@@ -17,7 +16,7 @@
     path: /captain/data/config-captain.json
   register: caprover_installed
 
-- name: Install prerequisites (if not installed.)
+- name: Install prerequisites (if not installed)
   apt:
     name:
       - apt-transport-https
@@ -48,7 +47,7 @@
   file:
     path: /etc/apt/keyrings
     state: directory
-    mode: 0755
+    mode: '0755'
   when: not caprover_installed.stat.exists
 
 - name: Download Docker GPG key
@@ -86,7 +85,7 @@
 
 - name: Install Docker Compose (if needed)
   get_url:
-    url: https://github.com/docker/compose/releases/download/1.29.2/docker-compose-Linux-x86_64
+    url: https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-Linux-x86_64
     dest: /usr/local/bin/docker-compose
     mode: '0755'
   when: not caprover_installed.stat.exists
@@ -102,7 +101,6 @@
     name: ubuntu
     groups: docker
     append: yes
-  become: true
 
 - name: Configure UFW ports (idempotent)
   ufw:
@@ -120,35 +118,43 @@
     - { port: 2377, proto: tcp }
     - { port: 22, proto: tcp }
   when: ansible_os_family == "Debian"
-  notify: reload ufw
 
-- name: Enable UFW (if not enabled)
-  shell: |
-    if ufw status | grep -q 'Status: active';
-    then
-      echo "UFW already enabled"
-    else
-      ufw --force enable
-    fi
-  args:
-    executable: /bin/bash
+- name: Enable UFW (idempotent)
+  ufw:
+    state: enabled
   when: ansible_os_family == "Debian"
 
+- name: Gather facts to get private IP
+  setup:
+    gather_subset: network
+
+- name: Leave existing swarm if active
+  command: docker swarm leave --force
+  ignore_errors: yes
+
 - name: Check Docker Swarm state
-  command: docker info --format '{{.Swarm.LocalNodeState}}'
+  command: docker info --format '{{ .Swarm.LocalNodeState }}'
   register: swarm_state
   changed_when: false
-  ignore_errors: true
+  failed_when: swarm_state.rc != 0
 
 - name: Initialize Docker Swarm
   command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
   when: swarm_state.stdout != 'active'
+  register: swarm_init
+  failed_when: swarm_init.rc != 0 and 'already part of a swarm' not in swarm_init.stderr
 
 - name: Create CapRover data directory
   file:
-    path: /captain
+    path: /captain/data
     state: directory
     mode: '0755'
+
+- name: Configure CapRover to use existing swarm
+  copy:
+    content: '{"useExistingSwarm": "true"}'
+    dest: /captain/data/config-override.json
+    mode: '0644'
 
 - name: Ensure CapRover service is running
   community.docker.docker_swarm_service:
@@ -171,6 +177,7 @@
         type: bind
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
+      MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
   when: swarm_state.stdout == 'active'
 
 - name: Verify CapRover API health
@@ -182,3 +189,13 @@
   retries: 15
   delay: 20
   when: swarm_state.stdout == 'active'
+
+handlers:
+  - name: restart docker
+    systemd:
+      name: docker
+      state: restarted
+
+  - name: reload ufw
+    ufw:
+      state: reloaded
