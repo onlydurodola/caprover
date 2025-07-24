@@ -1,3 +1,4 @@
+---
 - name: Debug SSM Connection
   command: echo "SSM connection successful"
   register: ssm_debug
@@ -189,13 +190,3 @@
   retries: 15
   delay: 20
   when: swarm_state.stdout == 'active'
-
-handlers:
-  - name: restart docker
-    systemd:
-      name: docker
-      state: restarted
-
-  - name: reload ufw
-    ufw:
-      state: reloaded
