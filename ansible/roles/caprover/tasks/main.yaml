@@ -1,9 +1,11 @@
+---
 - name: Debug SSM Connection
   command: echo "SSM connection successful"
   register: ssm_debug
   changed_when: false
 
-- debug:
+- name: Debug SSM Connection Output
+  debug:
     var: ssm_debug.stdout
 
 - name: Set Python interpreter
@@ -15,7 +17,7 @@
     path: /captain/data/config-captain.json
   register: caprover_installed
 
-- name: Install prerequisites (if not installed)
+- name: Install prerequisites (if not installed.)
   apt:
     name:
       - apt-transport-https
@@ -132,49 +134,44 @@
     executable: /bin/bash
   when: ansible_os_family == "Debian"
 
-- name: Leave existing swarm to ensure a clean state
-  command: docker swarm leave --force
+- name: Check Docker Swarm state
+  command: docker info --format '{{.Swarm.LocalNodeState}}'
+  register: swarm_state
+  changed_when: false
   ignore_errors: true
-  become: true
-  when: not caprover_installed.stat.exists
 
-- name: Initialize Docker Swarm with the instance's private IP
+- name: Initialize Docker Swarm
   command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
-  become: true
-  when: not caprover_installed.stat.exists
+  when: swarm_state.stdout != 'active'
 
 - name: Create CapRover data directory
   file:
-    path: /captain/data
+    path: /captain
     state: directory
     mode: '0755'
-  become: true
-  when: not caprover_installed.stat.exists
 
-- name: Configure CapRover to use the existing swarm
-  copy:
-    content: '{"useExistingSwarm": "true"}'
-    dest: /captain/data/config-override.json
-  become: true
-  when: not caprover_installed.stat.exists
-
-- name: Run CapRover container
-  docker_container:
+- name: Ensure CapRover service is running
+  community.docker.docker_swarm_service:
     name: caprover
     image: caprover/caprover
-    ports:
-      - "80:80"
-      - "443:443"
-      - "3000:3000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /captain:/captain
+    state: present
+    publish:
+      - published_port: 80
+        target_port: 80
+      - published_port: 443
+        target_port: 443
+      - published_port: 3000
+        target_port: 3000
+    mounts:
+      - source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        type: bind
+      - source: /captain
+        target: /captain
+        type: bind
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
-    restart_policy: always
-    state: started
-  become: true
-  when: not caprover_installed.stat.exists
+  when: swarm_state.stdout == 'active'
 
 - name: Verify CapRover API health
   uri:
@@ -184,30 +181,4 @@
   until: result.status == 200
   retries: 15
   delay: 20
-  when: not caprover_installed.stat.exists
-
-- name: Install CapRover CLI (if needed)
-  npm:
-    name: caprover
-    global: true
-    state: present
-  when: not caprover_installed.stat.exists
-
-- name: Login to CapRover to complete setup
-  command: >
-    caprover login
-    --caproverUrl http://localhost:3000
-    --caproverPassword "{{ vault_caprover_password }}"
-  changed_when: true
-  when: not caprover_installed.stat.exists
-
-- name: Update default CapRover domain
-  command: >
-    caprover api
-    --caproverUrl http://localhost:3000
-    --caproverPassword "{{ vault_caprover_password }}"
-    --method POST
-    --path /user/system/changerootdomain/
-    --data '{"rootDomain":"captain.{{ domain_name }}"}'
-  changed_when: true
-  when: not caprover_installed.stat.exists
+  when: swarm_state.stdout == 'active'
