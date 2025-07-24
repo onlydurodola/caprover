@@ -97,9 +97,14 @@
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       ACCEPTED_TERMS: "true"
+    restart_config:  # ADD THIS SECTION
+      condition: on-failure
+      delay: 10s
+      max_attempts: 5
+      window: 60s
   become: true
   when: not caprover_installed.stat.exists
-
+  
 - name: Verify CapRover API health
   uri:
     url: http://localhost:3000/api/health

@@ -177,10 +177,10 @@
 
 - name: Verify GitLab health
   uri:
-    url: http://localhost:8081/users/sign_in
-    status_code: [200, 302]
+    url: http://localhost:8081/-/health
+    status_code: 200
   register: gitlab_health
-  until: gitlab_health.status == 200 or gitlab_health.status == 302
+  until: gitlab_health.status == 200
   retries: 10
   delay: 10
 

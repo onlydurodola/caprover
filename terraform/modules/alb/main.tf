@@ -169,7 +169,7 @@ resource "aws_lb_listener_rule" "gitlab_http" {
 
 resource "aws_lb_listener_rule" "gitlab_https" {
   listener_arn = aws_lb_listener.https.arn
-  priority     = 150
+  priority     = 100
 
   action {
     type             = "forward"
@@ -201,7 +201,7 @@ resource "aws_lb_listener_rule" "caprover_dashboard" {
 
 resource "aws_lb_listener_rule" "caprover_dashboard_https" {
   listener_arn = aws_lb_listener.https.arn
-  priority     = 250
+  priority     = 200
 
   action {
     type             = "forward"
