@@ -134,16 +134,18 @@
   ignore_errors: yes
 
 - name: Check Docker Swarm state
-  command: docker info --format '{{ .Swarm.LocalNodeState }}'
+  command: docker info --format "{{ '{{' }}.Swarm.LocalNodeState{{ '}}' }}"
   register: swarm_state
   changed_when: false
-  failed_when: swarm_state.rc != 0
+  ignore_errors: true
 
 - name: Initialize Docker Swarm
   command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
   when: swarm_state.stdout != 'active'
   register: swarm_init
-  failed_when: swarm_init.rc != 0 and 'already part of a swarm' not in swarm_init.stderr
+  failed_when: >
+    swarm_init.rc != 0 and
+    'already part of a swarm' not in swarm_init.stderr
 
 - name: Create CapRover data directory
   file:
@@ -179,7 +181,6 @@
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
-  when: swarm_state.stdout == 'active'
 
 - name: Verify CapRover API health
   uri:
@@ -189,4 +190,3 @@
   until: result.status == 200
   retries: 15
   delay: 20
-  when: swarm_state.stdout == 'active'
