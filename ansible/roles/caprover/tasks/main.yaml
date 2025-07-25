@@ -22,6 +22,10 @@
     state: present
     update_cache: true
   when: not caprover_installed.stat.exists
+  retries: 5
+  delay: 10
+  register: apt_install_result
+  until: apt_install_result is successful
 
 - name: Create Docker GPG key directory
   file:
