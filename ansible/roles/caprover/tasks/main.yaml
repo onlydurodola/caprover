@@ -59,7 +59,7 @@
   when: not caprover_installed.stat.exists
 
 - name: Install required Python libraries for Docker
-  pip:
+  apt:
     name:
       - docker
       - docker-compose
