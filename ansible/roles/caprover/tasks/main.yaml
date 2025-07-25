@@ -12,12 +12,8 @@
 
 - name: Set CapRover installed fact
   set_fact:
-    caprover_installed: >-
-      {{
-        not caprover_service_status.failed and
-        caprover_service_status.exists and
-        (caprover_service_status.service.Status.State == 'running')
-      }}
+    caprover_installed: "{{ not caprover_service_status.failed and caprover_service_status.exists | default(false) }}"
+
 
 - name: Install prerequisites
   apt:
