@@ -17,6 +17,24 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+resource "aws_ebs_volume" "caprover_data" {
+  availability_zone = data.aws_availability_zones.available.names[0]
+  size              = 50
+  type              = "gp3"
+  tags = {
+    Name = "${var.env}-caprover-data"
+  }
+}
+
+resource "aws_ebs_volume" "gitlab_data" {
+  availability_zone = data.aws_availability_zones.available.names[1]
+  size              = 100
+  type              = "gp3"
+  tags = {
+    Name = "${var.env}-gitlab-data"
+  }
+}
+
 resource "aws_instance" "caprover" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t3.medium"
@@ -25,14 +43,6 @@ resource "aws_instance" "caprover" {
   vpc_security_group_ids      = [var.caprover_sg_id]
   key_name                    = "shortlink"
   iam_instance_profile        = var.iam_instance_profile_name
-  ebs_block_device {
-    device_name = "/dev/sdf"
-    volume_size = 50
-    volume_type = "gp3"
-    tags = {
-      Name = "${var.env}-caprover-data"
-    }
-  }
 
   user_data = <<-EOF
     #!/bin/bash
@@ -44,15 +54,20 @@ resource "aws_instance" "caprover" {
     sudo snap services amazon-ssm-agent
     
     # Wait for EBS volume to be available
-    while [ ! -e /dev/nvme1n1 ]; do sleep 2; done
+    while [ ! -e /dev/sdh ]; do sleep 2; done
     
-    # Format and mount CapRover data volume
-    if ! blkid /dev/nvme1n1; then
-      sudo mkfs -t ext4 /dev/nvme1n1
+    # Format if not formatted
+    if ! sudo blkid /dev/sdh; then
+      sudo mkfs -t ext4 /dev/sdh
     fi
+    
+    # Mount persistent volume
     sudo mkdir -p /captain
-    sudo mount /dev/nvme1n1 /captain
-    echo "/dev/nvme1n1 /captain ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
+    sudo mount /dev/sdh /captain
+    echo "/dev/sdh /captain ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
+    
+    # Ensure permissions
+    sudo chown -R ubuntu:ubuntu /captain
   EOF
 
   tags = {
@@ -68,14 +83,6 @@ resource "aws_instance" "gitlab" {
   vpc_security_group_ids      = [var.gitlab_sg_id]
   key_name                    = "shortlink"
   iam_instance_profile        = var.iam_instance_profile_name
-  ebs_block_device {
-    device_name = "/dev/sdg"
-    volume_size = 100 # GitLab requires more space
-    volume_type = "gp3"
-    tags = {
-      Name = "${var.env}-gitlab-data"
-    }
-  }
 
   user_data = <<-EOF
     #!/bin/bash
@@ -87,66 +94,39 @@ resource "aws_instance" "gitlab" {
     sudo snap services amazon-ssm-agent
     
     # Wait for EBS volume to be available
-    while [ ! -e /dev/nvme2n1 ]; do sleep 2; done
+    while [ ! -e /dev/sdi ]; do sleep 2; done
     
-    # Format and mount GitLab data volume
-    if ! blkid /dev/nvme2n1; then
-      sudo mkfs -t ext4 /dev/nvme2n1
+    # Format if not formatted
+    if ! sudo blkid /dev/sdi; then
+      sudo mkfs -t ext4 /dev/sdi
     fi
+    
+    # Mount persistent volume
     sudo mkdir -p /var/opt/gitlab
-    sudo mount /dev/nvme2n1 /var/opt/gitlab
-    echo "/dev/nvme2n1 /var/opt/gitlab ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
+    sudo mount /dev/sdi /var/opt/gitlab
+    echo "/dev/sdi /var/opt/gitlab ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
+    
+    # Ensure permissions
+    sudo chown -R git:git /var/opt/gitlab
   EOF
 
   root_block_device {
     volume_size = 20
   }
-
+  
   tags = {
     Name = "${var.env}-gitlab"
   }
 }
 
-resource "aws_ebs_volume" "caprover_data" {
-  availability_zone = data.aws_availability_zones.available.names[0]
-  size              = 50
-  type              = "gp3"
-  tags = {
-    Name = "${var.env}-caprover-data"
-  }
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-resource "aws_ebs_volume" "gitlab_data" {
-  availability_zone = data.aws_availability_zones.available.names[1]
-  size              = 100
-  type              = "gp3"
-  tags = {
-    Name = "${var.env}-gitlab-data"
-  }
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-resource "aws_volume_attachment" "caprover_ebs_att" {
-  device_name = "/dev/sdf"
+resource "aws_volume_attachment" "caprover_att" {
+  device_name = "/dev/sdh"  # Changed to unused device
   volume_id   = aws_ebs_volume.caprover_data.id
   instance_id = aws_instance.caprover.id
-
-  lifecycle {
-    ignore_changes = [instance_id]
-  }
 }
 
-resource "aws_volume_attachment" "gitlab_ebs_att" {
-  device_name = "/dev/sdg"
+resource "aws_volume_attachment" "gitlab_att" {
+  device_name = "/dev/sdi"  # Changed to unused device
   volume_id   = aws_ebs_volume.gitlab_data.id
   instance_id = aws_instance.gitlab.id
-
-  lifecycle {
-    ignore_changes = [instance_id]
-  }
 }
