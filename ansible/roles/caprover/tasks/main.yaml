@@ -18,11 +18,40 @@
       - ufw
       - nodejs
       - npm
+      - gnupg-agent
+    state: present
+    update_cache: true
+  when: not caprover_installed.stat.exists
+
+- name: Create Docker GPG key directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  when: not caprover_installed.stat.exists
+
+- name: Download Docker GPG key
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+  when: not caprover_installed.stat.exists
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+  when: not caprover_installed.stat.exists
+
+- name: Install Docker components
+  apt:
+    name:
       - docker-ce
       - docker-ce-cli
       - containerd.io
     state: present
-    update_cache: true
+    update_cache: true 
   when: not caprover_installed.stat.exists
 
 - name: Ensure Docker is running
@@ -37,6 +66,15 @@
     groups: docker
     append: yes
   become: true
+  when: not caprover_installed.stat.exists
+
+- name: Set Docker socket permissions
+      file:
+        path: /var/run/docker.sock
+        owner: root
+        group: docker
+        mode: '0660'
+      become: true
   when: not caprover_installed.stat.exists
 
 - name: Configure and enable UFW
