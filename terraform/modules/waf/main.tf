@@ -87,11 +87,11 @@ resource "aws_wafv2_web_acl" "main" {
 }
 
 resource "aws_wafv2_ip_set" "whitelist" {
-  count               = local.create_ip_set ? 1 : 0
-  name                = "${var.env}-whitelist"
-  scope               = "REGIONAL"
-  ip_address_version  = "IPV4"
-  addresses           = var.allowed_ips
+  count              = local.create_ip_set ? 1 : 0
+  name               = "${var.env}-whitelist"
+  scope              = "REGIONAL"
+  ip_address_version = "IPV4"
+  addresses          = var.allowed_ips
 }
 
 resource "aws_wafv2_web_acl_association" "alb" {

@@ -16,6 +16,6 @@ output "vpc_cidr" {
 }
 
 output "internal_sg_id" {
-  value = aws_security_group.internal.id
+  value       = aws_security_group.internal.id
   description = "ID of the internal security group for VPC endpoints"
 }

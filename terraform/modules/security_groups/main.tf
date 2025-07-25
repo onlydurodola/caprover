@@ -56,7 +56,7 @@ resource "aws_security_group_rule" "caprover_ingress_local_https" {
   from_port         = 443
   to_port           = 443
   protocol          = "tcp"
-  self              = true  # Allow self-access
+  self              = true # Allow self-access
 }
 
 resource "aws_security_group_rule" "caprover_ingress_dashboard" {
@@ -163,7 +163,7 @@ resource "aws_security_group_rule" "gitlab_egress_all" {
 
 resource "aws_security_group_rule" "alb_ingress_myip" {
   count = var.my_current_ip != "" ? 1 : 0
-  
+
   security_group_id = aws_security_group.alb.id
   type              = "ingress"
   description       = "Access from my current IP"
@@ -241,7 +241,7 @@ resource "aws_security_group_rule" "ssm_ingress" {
   from_port         = 443
   to_port           = 443
   protocol          = "tcp"
-  cidr_blocks       = [var.vpc_cidr] 
+  cidr_blocks       = [var.vpc_cidr]
 }
 
 resource "aws_security_group_rule" "gitlab_ssm_ingress" {
@@ -251,6 +251,6 @@ resource "aws_security_group_rule" "gitlab_ssm_ingress" {
   from_port         = 443
   to_port           = 443
   protocol          = "tcp"
-  cidr_blocks       = [var.vpc_cidr]  
+  cidr_blocks       = [var.vpc_cidr]
 }
-
+#

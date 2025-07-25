@@ -78,11 +78,11 @@ resource "aws_lb_target_group" "gitlab_http" {
     timeout             = 5
     healthy_threshold   = 2
     unhealthy_threshold = 2
-    matcher             = "200-399"  # Updated matcher
+    matcher             = "200-399" # Updated matcher
   }
 
   lifecycle {
-    create_before_destroy = true 
+    create_before_destroy = true
   }
 
   tags = {
@@ -95,8 +95,7 @@ resource "aws_lb_target_group_attachment" "caprover_http" {
   target_group_arn = aws_lb_target_group.caprover_http.arn
   target_id        = var.caprover_instance_id
   port             = 80
-  depends_on       = [aws_instance.caprover]
-  
+
 }
 
 resource "aws_lb_target_group_attachment" "caprover_https" {
@@ -146,9 +145,9 @@ resource "aws_lb_listener" "https" {
       content_type = "text/plain"
       status_code  = "404"
       message_body = "Invalid request"
-  }
+    }
 
-  } 
+  }
 }
 
 # Listener Rules

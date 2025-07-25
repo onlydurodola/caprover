@@ -21,7 +21,7 @@ resource "aws_instance" "caprover" {
   vpc_security_group_ids      = [var.caprover_sg_id]
   key_name                    = "shortlink"
   iam_instance_profile        = var.iam_instance_profile_name
-  user_data = <<-EOF
+  user_data                   = <<-EOF
     #!/bin/bash
     sudo apt update -y
     sudo apt install -y python3 python3-distutils
@@ -32,7 +32,7 @@ resource "aws_instance" "caprover" {
     EOF
 
   lifecycle {
-    ignore_changes = [associate_public_ip_address]
+    ignore_changes        = [associate_public_ip_address]
     create_before_destroy = true
   }
   tags = {
@@ -48,7 +48,7 @@ resource "aws_instance" "gitlab" {
   vpc_security_group_ids      = [var.gitlab_sg_id]
   key_name                    = "shortlink"
   iam_instance_profile        = var.iam_instance_profile_name
-  user_data = <<-EOF
+  user_data                   = <<-EOF
     #!/bin/bash
     sudo apt update -y
     sudo apt install -y python3 python3-distutils
@@ -59,7 +59,7 @@ resource "aws_instance" "gitlab" {
     EOF
 
   lifecycle {
-    ignore_changes = [associate_public_ip_address]
+    ignore_changes        = [associate_public_ip_address]
     create_before_destroy = true
   }
   root_block_device {
