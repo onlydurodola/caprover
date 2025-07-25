@@ -19,7 +19,6 @@
         mode: '0755'
   roles:
     - caprover
-    - { role: caprover, tags: ['restore'], when: "caprover_data_exists" }
 
 - hosts: gitlab
   connection: community.aws.aws_ssm

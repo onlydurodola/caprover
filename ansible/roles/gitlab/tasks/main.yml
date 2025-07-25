@@ -74,6 +74,13 @@
 - name: Flush handlers to apply GitLab configuration
   meta: flush_handlers
 
+- name: Wait for git user creation
+  wait_for:
+    path: /etc/passwd
+    search_regex: "^git:"
+    timeout: 120
+  when: not gitlab_data_exists
+
 - name: Check if root password is set
   become: true
   become_user: git
@@ -92,6 +99,7 @@
     user.password_confirmation = '{{ vault_gitlab_root_password }}'
     user.save!
     EOF
+  become_user: git
   when: 
     - not gitlab_data_exists
     - password_is_blank.stdout == "true"
@@ -108,5 +116,5 @@
     status_code: 200
   register: gitlab_health
   until: gitlab_health.status == 200
-  retries: 10
+  retries: 30
   delay: 10

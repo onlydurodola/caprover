@@ -107,7 +107,7 @@ resource "aws_instance" "gitlab" {
     echo "/dev/sdi /var/opt/gitlab ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
     
     # Ensure permissions
-    sudo chown -R git:git /var/opt/gitlab
+    sudo chown -R git:root /var/opt/gitlab
   EOF
 
   root_block_device {
