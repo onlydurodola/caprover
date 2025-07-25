@@ -1,3 +1,4 @@
+---
 - name: Verify SSM connectivity
   wait_for_connection:
     timeout: 120
@@ -7,10 +8,16 @@
     name: caprover
   register: caprover_service_status
   become: true
+  ignore_errors: yes
 
 - name: Set CapRover installed fact
   set_fact:
-    caprover_installed: "{{ caprover_service_status.exists and caprover_service_status.state == 'running' }}"
+    caprover_installed: >-
+      {{
+        not caprover_service_status.failed and
+        caprover_service_status.exists and
+        (caprover_service_status.service.Status.State == 'running')
+      }}
 
 - name: Install prerequisites
   apt:
