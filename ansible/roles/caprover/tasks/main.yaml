@@ -155,6 +155,8 @@
     env:
       CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       ACCEPTED_TERMS: "true"
+      CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
+      MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
     restart_config:  
       condition: on-failure
       delay: 10s
