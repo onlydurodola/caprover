@@ -69,12 +69,12 @@
   when: not caprover_installed.stat.exists
 
 - name: Set Docker socket permissions
-      file:
-        path: /var/run/docker.sock
-        owner: root
-        group: docker
-        mode: '0660'
-      become: true
+  file:
+    path: /var/run/docker.sock
+    owner: root
+    group: docker
+    mode: '0660'
+  become: true
   when: not caprover_installed.stat.exists
 
 - name: Configure and enable UFW
