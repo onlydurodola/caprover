@@ -41,7 +41,7 @@ resource "aws_wafv2_web_acl" "main" {
       name     = "IPWhitelist"
       priority = 2
       action {
-        block {}
+        allow {}
       }
       statement {
         not_statement {

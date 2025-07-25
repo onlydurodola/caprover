@@ -2,10 +2,15 @@
   wait_for_connection:
     timeout: 120
 
-- name: Check if CapRover is already installed
-  stat:
-    path: /captain/data/config-captain.json
-  register: caprover_installed
+- name: Check if CapRover service is running
+  community.docker.docker_swarm_service_info:
+    name: caprover
+  register: caprover_service_status
+  become: true
+
+- name: Set CapRover installed fact
+  set_fact:
+    caprover_installed: "{{ caprover_service_status.exists and caprover_service_status.state == 'running' }}"
 
 - name: Install prerequisites
   apt:
@@ -21,7 +26,7 @@
       - gnupg-agent
     state: present
     update_cache: true
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
   retries: 5
   delay: 10
   register: apt_install_result
@@ -32,21 +37,21 @@
     path: /etc/apt/keyrings
     state: directory
     mode: '0755'
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
 
 - name: Download Docker GPG key
   get_url:
     url: https://download.docker.com/linux/ubuntu/gpg
     dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
 
 - name: Add Docker repository
   apt_repository:
     repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
     state: present
     filename: docker
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
 
 - name: Install Docker components
   apt:
@@ -56,7 +61,7 @@
       - containerd.io
     state: present
     update_cache: true 
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
 
 - name: Install required Python libraries for Docker
   apt:
@@ -77,7 +82,7 @@
     groups: docker
     append: yes
   become: true
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
 
 - name: Set Docker socket permissions
   file:
@@ -86,7 +91,7 @@
     group: docker
     mode: '0660'
   become: true
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
 
 - name: Configure and enable UFW
   ufw:
@@ -118,6 +123,8 @@
   register: swarm_init
   changed_when: swarm_init.rc == 0
   failed_when: swarm_init.rc != 0 and "already part of a swarm" not in swarm_init.stderr
+  retries: 3
+  delay: 10
   
 - name: Create CapRover data directory
   file:
@@ -125,14 +132,14 @@
     state: directory
     mode: '0755'
   become: true
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
 
 - name: Configure CapRover to use existing swarm
   copy:
     content: '{"useExistingSwarm": "true"}'
     dest: /captain/data/config-override.json
   become: true
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
 
 - name: Install and start CapRover service using Ansible module
   community.docker.docker_swarm_service:
@@ -171,7 +178,7 @@
       max_attempts: 5
       window: 60s
   become: true
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed
   
 - name: Verify CapRover API health
   uri:
@@ -181,4 +188,4 @@
   until: result.status == 200
   retries: 30
   delay: 20
-  when: not caprover_installed.stat.exists
+  when: not caprover_installed

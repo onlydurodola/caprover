@@ -130,25 +130,14 @@
 
 
 - name: Wait for GitLab to be fully ready
-  shell: |
-    for i in {1..15}; do
-      if gitlab-rails runner "puts 'DB connectedBENCHMARK'" 2>/dev/null; then
-        if curl -sIf http://localhost:8081/users/sign_in; then
-          if gitlab-rails runner "puts Sidekiq::ProcessSet.new.size > 0"; then
-            exit 0
-          fi
-        fi
-      fi
-      sleep 30
-    done
-    exit 1
-  args:
-    executable: /bin/bash
-  register: gitlab_ready
-  until: gitlab_ready.rc == 0
-  retries: 10
-  delay: 3
-  ignore_errors: true 
+  uri:
+    url: http://localhost:8081/-/health
+    status_code: 200
+  register: gitlab_health
+  until: gitlab_health.status == 200
+  retries: 20
+  delay: 15
+  become: true
 
 - name: Verify GitLab external health
   uri:

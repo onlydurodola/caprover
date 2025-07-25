@@ -28,6 +28,10 @@
   tasks:
     - name: Pre-run connectivity check
       wait_for_connection:
-        timeout: 120
+        timeout: 300
+    - name: Test SSM connection
+      command: echo "SSM connection successful"
+      register: ssm_test
+    - debug: var=ssm_test.stdout
   roles:
     - gitlab
