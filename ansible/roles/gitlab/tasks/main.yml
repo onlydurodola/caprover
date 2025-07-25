@@ -2,18 +2,23 @@
   wait_for_connection:
     timeout: 120
 
-- name: Check if GitLab is installed
+- name: Check for existing GitLab data
   stat:
-    path: /usr/bin/gitlab-ctl
-  register: gitlab_installed
+    path: /var/opt/gitlab/.gitlab-data-exists
+  register: gitlab_data
+  become: true
 
-- name: Update system (if not installed)
+- name: Set GitLab data exists fact
+  set_fact:
+    gitlab_data_exists: "{{ gitlab_data.stat.exists }}"
+
+- name: Update system (only if no GitLab data exists)
   apt:
     upgrade: dist
     update_cache: true
-  when: not gitlab_installed.stat.exists
+  when: not gitlab_data_exists
 
-- name: Install prerequisites (if needed)
+- name: Install prerequisites (only if no data exists)
   apt:
     name:
       - curl
@@ -22,22 +27,20 @@
       - postfix
       - ufw
     state: present
-  when: not gitlab_installed.stat.exists
+  when: not gitlab_data_exists
 
-- name: Install GitLab (if not installed..)
+- name: Install GitLab (only if no data exists)
   shell: |
     curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
     apt-get install -y gitlab-ce
   args:
     creates: /usr/bin/gitlab-ctl
-  when: not gitlab_installed.stat.exists
+  when: not gitlab_data_exists
   notify: reconfigure gitlab
   retries: 5
   delay: 10
-  register: gitlab_install_result
-  until: gitlab_install_result.rc == 0
 
-- name: Configure UFW (idempotent)
+- name: Configure UFW (always apply)
   ufw:
     rule: allow
     port: "{{ item }}"
@@ -45,23 +48,10 @@
   loop:
     - 22
     - 80
-    - 8081  # GitLab port
-  when: ansible_os_family == "Debian"
+    - 8081
   notify: reload ufw
 
-- name: Enable UFW (if not enabled)
-  shell: |
-    if ufw status | grep -q 'Status: active'; then
-      echo "UFW already enabled"
-    else
-      ufw --force enable
-    fi
-  args:
-    executable: /bin/bash
-  when: ansible_os_family == "Debian"
-  notify: reload ufw
-
-- name: Configure GitLab settings (idempotent)
+- name: Configure GitLab settings (always apply)
   blockinfile:
     path: /etc/gitlab/gitlab.rb
     block: |
@@ -84,23 +74,15 @@
 - name: Flush handlers to apply GitLab configuration
   meta: flush_handlers
 
-- name: Configure DNS resolvers
-  blockinfile:
-    path: /etc/systemd/resolved.conf
-    block: |
-      DNS=8.8.8.8 1.1.1.1
-      Domains=~.
-    marker: "# {mark} ANSIBLE MANAGED BLOCK"
-  notify: restart systemd-resolved
-
 - name: Check if root password is set
   become: true
   become_user: git
   command: /opt/gitlab/bin/gitlab-rails runner "puts User.find(1).encrypted_password.blank?"
   register: password_is_blank
   changed_when: false
+  when: not gitlab_data_exists
 
-- name: Set root password (only if not set)
+- name: Set root password (only for new installations)
   become: true
   become_user: git
   shell: |
@@ -110,13 +92,15 @@
     user.password_confirmation = '{{ vault_gitlab_root_password }}'
     user.save!
     EOF
-  when: password_is_blank.stdout == "true"
+  when: 
+    - not gitlab_data_exists
+    - password_is_blank.stdout == "true"
 
 - name: Ensure GitLab services are running
-  shell: gitlab-ctl status
-  register: gitlab_status
-  changed_when: false
-  failed_when: "'down:' in gitlab_status.stdout"
+  systemd:
+    name: gitlab-runsvdir
+    state: started
+    enabled: true
 
 - name: Verify GitLab health
   uri:

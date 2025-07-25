@@ -55,12 +55,16 @@ resource "aws_lb_target_group" "caprover_dashboard" {
   vpc_id   = var.vpc_id
 
   health_check {
-    path                = "/"
+    path                = "/api/health"
     interval            = 30
-    timeout             = 5
+    timeout             = 10
     healthy_threshold   = 2
     unhealthy_threshold = 2
     matcher             = "200-399"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
@@ -189,7 +193,7 @@ resource "aws_lb_listener_rule" "caprover_dashboard" {
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.caprover_dashboard.arn
+    target_group_arn = aws_lb_target_group.caprover_https.arn
   }
 
   condition {
@@ -221,7 +225,7 @@ resource "aws_lb_listener_rule" "main_domain" {
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.caprover_http.arn
+    target_group_arn = aws_lb_target_group.caprover_dashboard.arn
   }
 
   condition {

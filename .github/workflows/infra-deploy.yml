@@ -76,6 +76,11 @@ jobs:
           echo "[defaults]" > ansible/ansible.cfg
           echo "allow_world_readable_tmpfiles = true" >> ansible/ansible.cfg
 
+      - name: Show GitLab Credentials (for debugging)
+        run: |
+          echo "GitLab root password: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}"
+          ansible-vault view ansible/vault.yml --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}")
+
       - name: Run Ansible Playbook
         uses: dawidd6/action-ansible-playbook@v2
         with:
@@ -102,10 +107,6 @@ jobs:
           PYTHONPATH: /usr/lib/python3/dist-packages
           PYTHONUNBUFFERED: 1
           ANSIBLE_FORCE_COLOR: 1
-          
-
-      - name: Debug inventory
-        run: cat .ansible_inventory
 
       - name: Verify Application Health
         if: github.ref == 'refs/heads/main'

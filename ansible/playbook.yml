@@ -12,8 +12,14 @@
     - name: Pre-run connectivity check
       wait_for_connection:
         timeout: 120
+    - name: Ensure /captain directory exists
+      file:
+        path: /captain
+        state: directory
+        mode: '0755'
   roles:
     - caprover
+    - { role: caprover, tags: ['restore'], when: "caprover_data_exists" }
 
 - hosts: gitlab
   connection: community.aws.aws_ssm
@@ -33,5 +39,10 @@
       command: echo "SSM connection successful"
       register: ssm_test
     - debug: var=ssm_test.stdout
+    - name: Ensure GitLab data directory exists
+      file:
+        path: /var/opt/gitlab
+        state: directory
+        mode: '0755'
   roles:
     - gitlab
