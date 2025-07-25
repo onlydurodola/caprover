@@ -24,7 +24,7 @@
     state: present
   when: not gitlab_installed.stat.exists
 
-- name: Install GitLab (if not installed.)
+- name: Install GitLab (if not installed..)
   shell: |
     curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
     apt-get install -y gitlab-ce
