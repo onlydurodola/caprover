@@ -148,8 +148,6 @@
   community.docker.docker_swarm_service:
     name: caprover
     image: caprover/caprover:latest
-    networks:
-      - name: host
     publish:
       - published_port: 80
         target_port: 80
