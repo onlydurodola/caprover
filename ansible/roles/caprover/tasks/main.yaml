@@ -12,23 +12,6 @@
   set_fact:
     caprover_data_exists: "{{ caprover_config.stat.exists }}"
 
-- name: Check Docker Swarm state
-  command: docker info --format '{{ '{{' }} .Swarm.LocalNodeState {{ '}}' }}'
-  register: swarm_state
-  changed_when: false
-  ignore_errors: true
-  become: true
-
-- name: Initialize Docker Swarm if needed
-  command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
-  when: 
-    - swarm_state.stdout | trim != 'active'
-    - not caprover_data_exists
-  become: true
-  register: swarm_init
-  changed_when: swarm_init.rc == 0
-  failed_when: swarm_init.rc != 0 and "already part of a swarm" not in swarm_init.stderr
-
 - name: Install prerequisites
   apt:
     name:
@@ -77,6 +60,23 @@
     state: present
     update_cache: true 
   when: not caprover_data_exists
+
+- name: Check Docker Swarm state
+  command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }}{% endraw %}'
+  register: swarm_state
+  changed_when: false
+  ignore_errors: true
+  become: true
+
+- name: Initialize Docker Swarm if needed
+  command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
+  when: 
+    - swarm_state.stdout | trim != 'active'
+    - not caprover_data_exists
+  become: true
+  register: swarm_init
+  changed_when: swarm_init.rc == 0
+  failed_when: swarm_init.rc != 0 and "already part of a swarm" not in swarm_init.stderr
 
 - name: Install required Python libraries for Docker
   apt:
