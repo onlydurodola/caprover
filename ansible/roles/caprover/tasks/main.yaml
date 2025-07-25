@@ -178,6 +178,28 @@
   become: true
   when: not caprover_data_exists
 
+- name: Configure CapRover to bind to all interfaces
+  replace:
+    path: /captain/data/config-captain.json
+    regexp: '"nginxConfig": {'
+    replace: '"nginxConfig": {\n    "serverIp": "0.0.0.0",'
+  become: true
+  when: not caprover_data_exists
+  register: config_updated
+  failed_when: false  # Continue even if file not found yet
+
+- name: Wait for configuration to apply
+  wait_for:
+    path: /captain/data/config-captain.json
+    timeout: 60
+  become: true
+  when: not caprover_data_exists and config_updated.changed
+
+- name: Restart CapRover service
+  command: docker service update --force captain-captain
+  become: true
+  when: not caprover_data_exists
+
 - name: Start CapRover from existing data
   community.docker.docker_stack:
     name: captain
