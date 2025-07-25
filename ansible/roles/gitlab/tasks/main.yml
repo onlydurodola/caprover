@@ -25,22 +25,28 @@
   when: not gitlab_installed.stat.exists
 
 - name: Install GitLab (if not installed)
-  shell: |
+  become: true
+  become_user: root
+  command: |
+    bash -c '
     curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | bash
     apt-get install -y gitlab-ce
+    '
   args:
     creates: /usr/bin/gitlab-ctl
   when: not gitlab_installed.stat.exists
-  notify: reconfigure gitlab
-  retries: 5
-  delay: 10
   register: gitlab_install_result
-  until: gitlab_install_result.rc == 0
+  changed_when: "'is already installed' not in gitlab_install_result.stderr"
+  retries: 3
+  delay: 20
 
 - name: Reconfigure GitLab
-  command: gitlab-ctl reconfigure
   become: true
+  become_user: root
+  command: gitlab-ctl reconfigure
   when: not gitlab_installed.stat.exists
+  async: 600  # Allow up to 10 minutes
+  poll: 30    # Check every 30 seconds
   register: reconfigure_result
 
 - name: Configure UFW (idempotent)
