@@ -58,6 +58,13 @@
     update_cache: true 
   when: not caprover_installed.stat.exists
 
+  - name: Install required Python libraries for Docker
+  pip:
+    name:
+      - docker
+      - docker-compose
+    state: present
+
 - name: Ensure Docker is running
   systemd:
     name: docker
