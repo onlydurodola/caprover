@@ -71,6 +71,11 @@ jobs:
           pip install docker ansible-core
           pip install -r ansible/requirements.txt
 
+      - name: Create ansible.cfg
+        run: |
+          echo "[defaults]" > ansible/ansible.cfg
+          echo "allow_world_readable_tmpfiles = true" >> ansible/ansible.cfg
+
       - name: Run Ansible Playbook
         uses: dawidd6/action-ansible-playbook@v2
         with:
@@ -97,7 +102,7 @@ jobs:
           PYTHONPATH: /usr/lib/python3/dist-packages
           PYTHONUNBUFFERED: 1
           ANSIBLE_FORCE_COLOR: 1
-          ANSIBLE_ALLOW_WORLD_READABLE_TMPFILES: true 
+          
 
       - name: Debug inventory
         run: cat .ansible_inventory

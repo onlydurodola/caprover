@@ -144,7 +144,7 @@
   become: true
   when: not caprover_installed
 
-- name: Install and start CapRover service using Ansible module
+- name: Install and start CapRover service using Ansible module.
   community.docker.docker_swarm_service:
     name: caprover
     image: caprover/caprover:latest
