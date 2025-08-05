@@ -205,8 +205,6 @@
       delay: 10s
       max_attempts: 5
       window: 60s
-    constraints:
-      - "node.role==manager"
   become: true
   when: not caprover_data_exists
 
