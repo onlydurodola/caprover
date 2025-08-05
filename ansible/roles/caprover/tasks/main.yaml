@@ -12,6 +12,11 @@
   set_fact:
     caprover_data_exists: "{{ caprover_config.stat.exists }}"
 
+- name: Wait for dpkg lock to be released
+  become: true
+  command: while fuser /var/lib/dpkg/lock-frontend; do sleep 5; done
+  when: not caprover_data_exists
+
 - name: Install prerequisites
   apt:
     name:
