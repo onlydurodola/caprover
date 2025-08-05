@@ -49,7 +49,7 @@ resource "aws_lb_target_group" "caprover_https" {
 }
 
 resource "aws_lb_target_group" "caprover_dashboard" {
-  name        = "caprover-dashboard-tg-${var.env}"
+  name        = "caprover-dash-tg-${var.env}-${random_id.tg_suffix.hex}"
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
