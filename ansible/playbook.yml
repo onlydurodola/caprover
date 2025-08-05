@@ -3,7 +3,10 @@
     - name: Ensure vault password is valid
       fail:
         msg: "Vault password contains invalid characters: {{ vault_test | string | regex_replace('^.*$', '*****') }}"
-      when: "'\"' in vault_caprover_password or '\\' in vault_caprover_password or '\'' in vault_caprover_password"
+      when: > 
+        '"' in vault_caprover_password or 
+        '\\' in vault_caprover_password or 
+        "'" in vault_caprover_password
       vars:
         vault_test: "{{ vault_caprover_password + vault_gitlab_root_password }}"
       run_once: true
