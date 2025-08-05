@@ -107,7 +107,10 @@
   become: true
   register: swarm_init
   changed_when: swarm_init.rc == 0
-  failed_when: swarm_init.rc != 0 and "already part of a swarm" not in swarm_init.stderr
+  failed_when: >
+    swarm_init.rc != 0 and 
+    "already part of a swarm" not in swarm_init.stderr and
+    "already a swarm manager" not in swarm_init.stderr
 
 - name: Install required Python libraries for Docker
   apt:
@@ -170,6 +173,27 @@
   become: true
   when: not caprover_data_exists
 
+- name: Ensure no existing CapRover services
+  become: true
+  block:
+    - name: Remove existing captain-captain service
+      command: docker service rm captain-captain
+      ignore_errors: true
+      register: service_rm_result
+      failed_when: false
+
+    - name: Remove existing captain stack
+      command: docker stack rm captain
+      ignore_errors: true
+      register: stack_rm_result
+      failed_when: false
+
+    - name: Wait for cleanup completion
+      wait_for:
+        timeout: 30
+      when: service_rm_result.changed or stack_rm_result.changed
+  when: not caprover_data_exists
+
 - name: Install CapRover using Docker Swarm
   community.docker.docker_swarm_service:
     name: captain-captain
@@ -206,6 +230,17 @@
       max_attempts: 5
       window: 60s
   become: true
+  when: not caprover_data_exists
+
+- name: Capture CapRover installation logs
+  command: docker service logs captain-captain --tail 50
+  register: caprover_logs
+  failed_when: false
+  when: not caprover_data_exists
+
+- name: Display installation logs
+  debug:
+    var: caprover_logs.stdout_lines
   when: not caprover_data_exists
 
 - name: Configure CapRover to bind to all interfaces
