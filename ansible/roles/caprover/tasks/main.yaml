@@ -6,11 +6,12 @@
   become: true
   block:
     - name: Wait for cloud-init to complete
+      become: true
       command: cloud-init status --wait
       register: cloud_init_status
       retries: 30
       delay: 10
-      until: cloud_init_status.stdout == "status: done"
+      until: cloud_init_status.stdout == ""status: done"""
       changed_when: false
 
     - name: Stop unattended upgrades
