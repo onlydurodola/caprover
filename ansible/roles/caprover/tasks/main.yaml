@@ -238,7 +238,7 @@
   become: true
   when: caprover_data_exists
 
-- name: Ensure CapRover password is set correctly
+- name: Ensure CapRover password is set correctly.
   become: true
   block:
     - name: Generate bcrypt hash for new password
