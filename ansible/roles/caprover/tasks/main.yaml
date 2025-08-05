@@ -139,10 +139,10 @@
   become: true
   when: not caprover_data_exists
 
-- name: Install CapRover service
+- name: Install CapRover using Docker Swarm
   community.docker.docker_swarm_service:
-    name: caprover
-    image: caprover/caprover:latest
+    name: captain-captain
+    image: caprover/caprover:{{ caprover_version | default('latest') }}
     publish:
       - published_port: 80
         target_port: 80
@@ -169,12 +169,13 @@
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
       MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
       BY_PASS_PROXY_CHECK: "TRUE"
-      USE_EXISTING_SWARM: "false"
     restart_config:  
       condition: on-failure
       delay: 10s
       max_attempts: 5
       window: 60s
+    constraints:
+      - "node.role==manager"
   become: true
   when: not caprover_data_exists
 
@@ -207,6 +208,40 @@
     with_registry_auth: yes
   become: true
   when: caprover_data_exists
+
+- name: Ensure CapRover password is set correctly
+  become: true
+  block:
+    - name: Generate bcrypt hash for new password
+      delegate_to: localhost
+      run_once: true
+      set_fact:
+        caprover_password_hash: "{{ vault_caprover_password | password_hash('bcrypt') }}"
+
+    - name: Update CapRover configuration
+      replace:
+        path: /captain/data/config-captain.json
+        regexp: '"hashedPassword":.*'
+        replace: '"hashedPassword": "{{ caprover_password_hash }}"'
+      register: config_updated
+
+    - name: Restart CapRover if configuration changed
+      command: docker service update --force captain-captain
+      when: config_updated.changed
+
+    - name: Verify CapRover login
+      uri:
+        url: http://localhost:3000/api/v2/login
+        method: POST
+        body_format: json
+        body:
+          password: "{{ vault_caprover_password }}"
+        status_code: 200
+        timeout: 10
+      register: login_result
+      until: login_result.status == 200
+      retries: 5
+      delay: 5
 
 - name: Verify CapRover API health
   uri:

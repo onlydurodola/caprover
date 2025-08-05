@@ -113,20 +113,20 @@ resource "aws_instance" "gitlab" {
   root_block_device {
     volume_size = 20
   }
-  
+
   tags = {
     Name = "${var.env}-gitlab"
   }
 }
 
 resource "aws_volume_attachment" "caprover_att" {
-  device_name = "/dev/sdh"  # Changed to unused device
+  device_name = "/dev/sdh" # Changed to unused device
   volume_id   = aws_ebs_volume.caprover_data.id
   instance_id = aws_instance.caprover.id
 }
 
 resource "aws_volume_attachment" "gitlab_att" {
-  device_name = "/dev/sdi"  # Changed to unused device
+  device_name = "/dev/sdi" # Changed to unused device
   volume_id   = aws_ebs_volume.gitlab_data.id
   instance_id = aws_instance.gitlab.id
 }

@@ -89,26 +89,64 @@
   changed_when: false
   when: not gitlab_data_exists
 
-- name: Set root password (only for new installations)
+- name: Force root password reset
   become: true
-  become_user: git
   shell: |
     /opt/gitlab/bin/gitlab-rails runner -e production <<EOF
-    user = User.find(1)
+    user = User.find_by(username: 'root')
     user.password = '{{ vault_gitlab_root_password }}'
     user.password_confirmation = '{{ vault_gitlab_root_password }}'
     user.save!
     EOF
-  become_user: git
-  when: 
-    - not gitlab_data_exists
-    - password_is_blank.stdout == "true"
+  args:
+    executable: /bin/bash
+  when: not gitlab_data_exists
 
 - name: Ensure GitLab services are running
   systemd:
     name: gitlab-runsvdir
     state: started
     enabled: true
+
+- name: Ensure GitLab root password is set
+  become: true
+  block:
+    - name: Reset GitLab root password
+      shell: |
+        /opt/gitlab/bin/gitlab-rails runner -e production <<EOF
+        user = User.find_by_username('root')
+        if user.valid_password?('{{ vault_gitlab_root_password }}')
+          puts 'true'
+        else
+          user.password = '{{ vault_gitlab_root_password }}'
+          user.password_confirmation = '{{ vault_gitlab_root_password }}'
+          user.save!
+          puts 'changed'
+        end
+        EOF
+      args:
+        executable: /bin/bash
+      register: password_reset
+      changed_when: "'changed' in password_reset.stdout"
+
+    - name: Reconfigure GitLab after password change
+      command: gitlab-ctl reconfigure
+      when: password_reset.changed
+
+    - name: Verify GitLab login
+      uri:
+        url: http://localhost:8081/api/v4/user
+        method: GET
+        return_content: true
+        status_code: 200
+        user: root
+        password: "{{ vault_gitlab_root_password }}"
+        force_basic_auth: true
+        timeout: 10
+      register: login_result
+      until: "'root' in login_result.json.username"
+      retries: 10
+      delay: 10
 
 - name: Verify GitLab health
   uri:

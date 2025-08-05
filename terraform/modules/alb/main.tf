@@ -49,10 +49,11 @@ resource "aws_lb_target_group" "caprover_https" {
 }
 
 resource "aws_lb_target_group" "caprover_dashboard" {
-  name     = "caprover-dashboard-tg-${var.env}"
-  port     = 3000
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  name        = "caprover-dashboard-tg-${var.env}"
+  port        = 3000
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
 
   health_check {
     path                = "/api/health"

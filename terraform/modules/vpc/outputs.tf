@@ -19,3 +19,7 @@ output "internal_sg_id" {
   value       = aws_security_group.internal.id
   description = "ID of the internal security group for VPC endpoints"
 }
+
+output "nat_eip" {
+  value = aws_eip.nat.public_ip
+}
