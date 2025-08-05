@@ -2,6 +2,36 @@
   wait_for_connection:
     timeout: 120
 
+- name: Prepare system for provisioning
+  become: true
+  block:
+    - name: Wait for cloud-init to complete
+      command: cloud-init status --wait
+      register: cloud_init_status
+      retries: 30
+      delay: 10
+      until: cloud_init_status.stdout == "status: done"
+      changed_when: false
+
+    - name: Stop unattended upgrades
+      systemd:
+        name: unattended-upgrades
+        state: stopped
+      ignore_errors: true
+
+- name: Wait for dpkg lock to be released
+  become: true
+  shell: |
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+      echo "Waiting for dpkg lock to be released..."
+      sleep 5
+    done
+  register: lock_check
+  retries: 12
+  delay: 5
+  until: lock_check.rc == 0
+  changed_when: false
+
 - name: Check for existing CapRover data
   stat:
     path: /captain/data/config-captain.yml
@@ -11,11 +41,6 @@
 - name: Set CapRover data exists fact
   set_fact:
     caprover_data_exists: "{{ caprover_config.stat.exists }}"
-
-- name: Wait for dpkg lock to be released
-  become: true
-  command: while fuser /var/lib/dpkg/lock-frontend; do sleep 5; done
-  when: not caprover_data_exists
 
 - name: Install prerequisites
   apt:

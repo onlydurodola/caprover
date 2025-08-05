@@ -46,6 +46,13 @@ resource "aws_instance" "caprover" {
 
   user_data = <<-EOF
     #!/bin/bash
+    # Stop unattended upgrades immediately
+    systemctl stop unattended-upgrades
+    systemctl disable unattended-upgrades
+
+    # Wait for cloud-init to complete
+    cloud-init status --wait
+
     sudo apt update -y
     sudo apt install -y python3 python3-distutils
     sudo snap install amazon-ssm-agent --classic
@@ -68,7 +75,23 @@ resource "aws_instance" "caprover" {
     
     # Ensure permissions
     sudo chown -R ubuntu:ubuntu /captain
+
+
   EOF
+
+provisioner "local-exec" {
+    command = <<-EOT
+      echo "Waiting for instance to be ready and SSM Agent to be active"
+      aws ssm wait instance-online \
+        --instance-ids ${self.id} \
+        --region eu-north-1 \
+        --max-attempts 30 \
+        --wait-delay 10
+    EOT
+    environment = {
+      AWS_DEFAULT_REGION = "eu-north-1"
+    }
+  }
 
   tags = {
     Name = "${var.env}-caprover"
@@ -108,6 +131,8 @@ resource "aws_instance" "gitlab" {
     
     # Ensure permissions
     sudo chown -R git:root /var/opt/gitlab
+
+    
   EOF
 
   root_block_device {
