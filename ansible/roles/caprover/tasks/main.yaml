@@ -189,7 +189,7 @@
   register: config_updated
   failed_when: false  # Continue even if file not found yet
 
-- name: Wait for configuration to apply
+- name: Wait for configuration to apply.
   wait_for:
     path: /captain/data/config-captain.json
     timeout: 60
