@@ -79,20 +79,6 @@ resource "aws_instance" "caprover" {
 
   EOF
 
-provisioner "local-exec" {
-    command = <<-EOT
-      echo "Waiting for instance to be ready and SSM Agent to be active"
-      aws ssm wait instance-online \
-        --instance-ids ${self.id} \
-        --region eu-north-1 \
-        --max-attempts 30 \
-        --wait-delay 10
-    EOT
-    environment = {
-      AWS_DEFAULT_REGION = "eu-north-1"
-    }
-  }
-
   tags = {
     Name = "${var.env}-caprover"
   }
