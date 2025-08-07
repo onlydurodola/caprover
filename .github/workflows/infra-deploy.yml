@@ -71,6 +71,7 @@ jobs:
           pip install docker ansible-core
           pip install -r ansible/requirements.txt
           pip install passlib
+          pip install jsondiff
 
       - name: Create ansible.cfg
         run: |
