@@ -206,9 +206,10 @@
           captain-captain:
             image: caprover/caprover:latest
             ports:
-              - "80:80"
-              - "443:443"
-              - "3000:3000"
+              - target: 3000
+                published: 3000
+                protocol: tcp
+                mode: host
             volumes:
               - /var/run/docker.sock:/var/run/docker.sock
               - /captain:/captain
