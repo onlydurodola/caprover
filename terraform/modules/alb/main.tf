@@ -56,11 +56,27 @@ resource "aws_lb_target_group" "caprover_dashboard" {
 
   health_check {
     path                = "/api/health"
+    protocol            = "HTTP"
     interval            = 30
     timeout             = 20
     healthy_threshold   = 2
     unhealthy_threshold = 2
     matcher             = "200-399"
+  }
+
+  resource "aws_lb_listener_rule" "caprover" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.caprover.arn
+  }
+
+  condition {
+    host_header {
+      values = ["captain.oluwatobiloba.tech"]
+    }
   }
 
   lifecycle {
