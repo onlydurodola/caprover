@@ -89,7 +89,35 @@
       - python3-pip
       - docker
       - docker-compose
+      - python3-docker
+      - python3-requests
     state: present
+  become: true
+
+- name: Ensure pip is functional
+  command: python3 -m pip --version
+  register: pip_version
+  changed_when: false
+  become: true
+
+- name: Install jsondiff via pip with specific versions
+  pip:
+    name:
+      - jsondiff==2.2.0
+    state: present
+    executable: /usr/bin/pip3
+  become: true
+  when: pip_version.rc == 0
+
+- name: Verify Python dependencies on remote host
+  command: python3 -c "import {{ item }}"
+  loop:
+    - docker
+    - jsondiff
+    - requests
+  register: dependency_check
+  failed_when: dependency_check.rc != 0
+  changed_when: false
   become: true
 
 - name: Install passlib for password hashing
@@ -166,25 +194,6 @@
     mode: '0664'
   become: true
   when: not caprover_data_exists
-
-- name: Install jsondiff via pip with specific versions
-  pip:
-    name:
-      - jsondiff
-    
-    state: present
-    executable: /usr/bin/pip3 
-  become: true
-  when: pip_version.rc == 0
-
-- name: Verify jsondiff installation
-  delegate_to: localhost
-  run_once: true
-  become: false
-  command: /usr/bin/python3 -c "import jsondiff"
-  register: jsondiff_check
-  failed_when: jsondiff_check.rc != 0
-  ignore_errors: false
 
 - name: Deploy CapRover service
   community.docker.docker_stack:
