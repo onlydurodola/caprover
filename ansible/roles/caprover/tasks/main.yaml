@@ -167,11 +167,15 @@
   become: true
   when: not caprover_data_exists
 
-- name: Install jsondiff in system Python
-  delegate_to: localhost
-  run_once: true
-  become: false
-  command: /home/runner/.local/bin/pip3 install jsondiff
+- name: Install jsondiff via pip with specific versions
+  pip:
+    name:
+      - jsondiff
+    
+    state: present
+    executable: /usr/bin/pip3 
+  become: true
+  when: pip_version.rc == 0
 
 - name: Verify jsondiff installation
   delegate_to: localhost
