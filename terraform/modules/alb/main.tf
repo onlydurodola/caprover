@@ -57,7 +57,7 @@ resource "aws_lb_target_group" "caprover_dashboard" {
   health_check {
     path                = "/api/health"
     interval            = 30
-    timeout             = 10
+    timeout             = 20
     healthy_threshold   = 2
     unhealthy_threshold = 2
     matcher             = "200-399"

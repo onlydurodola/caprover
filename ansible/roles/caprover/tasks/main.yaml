@@ -243,15 +243,15 @@
     var: caprover_logs.stdout_lines
   when: not caprover_data_exists
 
-- name: Configure CapRover to bind to all interfaces
-  replace:
+- name: Ensure CapRover binds to all interfaces
+  lineinfile:
     path: /captain/data/config-captain.json
-    regexp: '"nginxConfig": {'
-    replace: '"nginxConfig": {\n    "serverIp": "0.0.0.0",'
+    regexp: '"serverIp":'
+    line: '    "serverIp": "0.0.0.0",'
+    insertafter: '"nginxConfig": {'
   become: true
-  when: not caprover_data_exists
   register: config_updated
-  failed_when: false  # Continue even if file not found yet
+  when: not caprover_data_exists
 
 - name: Wait for configuration to apply.
   wait_for:
@@ -272,6 +272,13 @@
     with_registry_auth: yes
   become: true
   when: caprover_data_exists
+
+- name: Wait for CapRover service to start
+  wait_for:
+    host: localhost
+    port: 3000
+    state: started
+    timeout: 60
 
 - name: Ensure CapRover password is set correctly.
   become: true
