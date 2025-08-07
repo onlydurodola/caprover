@@ -125,6 +125,13 @@
     - not gitlab_data_exists
     - password_is_blank.stdout == "true"
 
+- name: Mark GitLab as configured
+  file:
+    path: /var/opt/gitlab/.gitlab-data-exists
+    state: touch
+  become: true
+  when: not gitlab_data_exists
+
 - name: Verify GitLab health
   uri:
     url: http://localhost:8081/-/health

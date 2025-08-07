@@ -2,6 +2,17 @@
   wait_for_connection:
     timeout: 120
 
+- name: Remove conflicting CapRover services (only on new installations)
+  shell: |
+    # Safely remove services if they exist
+    docker service rm captain_captain-captain 2>/dev/null || true
+    docker stack rm captain 2>/dev/null || true
+  become: true
+  when: 
+    - not caprover_data_exists
+    - "'active' in swarm_state.stdout"
+  ignore_errors: true
+
 - name: Check for existing CapRover data
   stat:
     path: /captain/data/config-captain.yml
@@ -226,6 +237,28 @@
                 delay: 10s
                 max_attempts: 5
                 window: 60s
+            depends_on:
+              - captain-certbot
+              - captain-nginx
+
+          captain-certbot:
+            image: caprover/certbot-sleeping:v2.11.0
+            volumes:
+              - /captain/data/letencrypt:/etc/letsencrypt
+
+          captain-nginx:
+            image: nginx:1.27.2
+            ports:
+              - target: 80
+                published: 80
+                protocol: tcp
+                mode: host
+              - target: 443
+                published: 443
+                protocol: tcp
+                mode: host
+            volumes:
+              - /captain/data/nginx/conf.d:/etc/nginx/conf.d
   become: true
   when: not caprover_data_exists
 

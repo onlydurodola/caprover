@@ -37,7 +37,7 @@ resource "aws_ebs_volume" "gitlab_data" {
 
 resource "aws_instance" "caprover" {
   ami                         = data.aws_ami.ubuntu.id
-  instance_type               = "t3.medium"
+  instance_type               = "t3.xlarge"
   subnet_id                   = var.public_subnet_ids[0]
   associate_public_ip_address = true
   vpc_security_group_ids      = [var.caprover_sg_id]
