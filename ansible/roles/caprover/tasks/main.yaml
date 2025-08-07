@@ -186,7 +186,7 @@
   become: true
   when: not caprover_data_exists
   register: config_updated
-  failed_when: false  # Continue even if file not found yet
+  failed_when: false
 
 - name: Wait for configuration to apply
   wait_for:
