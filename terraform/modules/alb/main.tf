@@ -56,7 +56,6 @@ resource "aws_lb_target_group" "caprover_dashboard" {
 
   health_check {
     path                = "/api/health"
-    protocol            = "HTTP"
     interval            = 30
     timeout             = 20
     healthy_threshold   = 2
@@ -64,23 +63,28 @@ resource "aws_lb_target_group" "caprover_dashboard" {
     matcher             = "200-399"
   }
 
-  resource "aws_lb_listener_rule" "caprover" {
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_lb_listener_rule" "caprover_health_check" {
   listener_arn = aws_lb_listener.https.arn
-  priority     = 100
+  priority     = 50
 
   action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.caprover.arn
-  }
-
-  condition {
-    host_header {
-      values = ["captain.oluwatobiloba.tech"]
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "OK"
+      status_code  = "200"
     }
   }
 
-  lifecycle {
-    create_before_destroy = true
+  condition {
+    path_pattern {
+      values = ["/api/health"]
+    }
   }
 }
 
