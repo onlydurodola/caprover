@@ -98,6 +98,14 @@
     state: present
   become: true
 
+- name: Install jsondiff on control node
+  delegate_to: localhost
+  run_once: true
+  pip:
+    name: jsondiff
+    state: present
+  become: false
+  
 - name: Ensure Docker is running
   systemd:
     name: docker
