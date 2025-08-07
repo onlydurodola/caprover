@@ -2,37 +2,6 @@
   wait_for_connection:
     timeout: 120
 
-- name: Prepare system for provisioning
-  become: true
-  block:
-    - name: Wait for cloud-init to complete
-      become: true
-      command: cloud-init status --wait
-      register: cloud_init_status
-      retries: 30
-      delay: 10
-      until: "'done' in cloud_init_status.stdout"
-      changed_when: false
-
-    - name: Stop unattended upgrades
-      systemd:
-        name: unattended-upgrades
-        state: stopped
-      ignore_errors: true
-
-- name: Wait for dpkg lock to be released
-  become: true
-  shell: |
-    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-      echo "Waiting for dpkg lock to be released..."
-      sleep 5
-    done
-  register: lock_check
-  retries: 12
-  delay: 5
-  until: lock_check.rc == 0
-  changed_when: false
-
 - name: Check for existing CapRover data
   stat:
     path: /captain/data/config-captain.yml
@@ -59,7 +28,7 @@
     update_cache: true
   when: not caprover_data_exists
   retries: 5
-  delay: 30
+  delay: 10
 
 - name: Create Docker GPG key directory
   file:
@@ -89,7 +58,7 @@
       - docker-ce-cli
       - containerd.io
     state: present
-    update_cache: true 
+    update_cache: true
   when: not caprover_data_exists
 
 - name: Check Docker Swarm state
@@ -99,18 +68,15 @@
   ignore_errors: true
   become: true
 
-- name: Initialize Docker Swarm if needed
+- name: Initialize Docker Swarm if needed..
   command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
-  when: 
+  when:
     - swarm_state.stdout | trim != 'active'
     - not caprover_data_exists
   become: true
   register: swarm_init
   changed_when: swarm_init.rc == 0
-  failed_when: >
-    swarm_init.rc != 0 and 
-    "already part of a swarm" not in swarm_init.stderr and
-    "already a swarm manager" not in swarm_init.stderr
+  failed_when: swarm_init.rc != 0 and "already part of a swarm" not in swarm_init.stderr
 
 - name: Install required Python libraries for Docker
   apt:
@@ -173,31 +139,10 @@
   become: true
   when: not caprover_data_exists
 
-- name: Ensure no existing CapRover services
-  become: true
-  block:
-    - name: Remove existing captain-captain service
-      command: docker service rm captain-captain
-      ignore_errors: true
-      register: service_rm_result
-      failed_when: false
-
-    - name: Remove existing captain stack
-      command: docker stack rm captain
-      ignore_errors: true
-      register: stack_rm_result
-      failed_when: false
-
-    - name: Wait for cleanup completion
-      wait_for:
-        timeout: 30
-      when: service_rm_result.changed or stack_rm_result.changed
-  when: not caprover_data_exists
-
-- name: Install CapRover using Docker Swarm
+- name: Install CapRover service
   community.docker.docker_swarm_service:
-    name: captain-captain
-    image: caprover/caprover:{{ caprover_version | default('latest') }}
+    name: caprover
+    image: caprover/caprover:latest
     publish:
       - published_port: 80
         target_port: 80
@@ -224,7 +169,8 @@
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
       MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
       BY_PASS_PROXY_CHECK: "TRUE"
-    restart_config:  
+      USE_EXISTING_SWARM: "false"
+    restart_config:
       condition: on-failure
       delay: 10s
       max_attempts: 5
@@ -232,28 +178,57 @@
   become: true
   when: not caprover_data_exists
 
-- name: Capture CapRover installation logs
-  command: docker service logs captain-captain --tail 50
-  register: caprover_logs
-  failed_when: false
-  when: not caprover_data_exists
-
-- name: Display installation logs
-  debug:
-    var: caprover_logs.stdout_lines
-  when: not caprover_data_exists
-
-- name: Ensure CapRover binds to all interfaces
-  lineinfile:
-    path: /captain/data/config-captain.json
-    regexp: '"serverIp":'
-    line: '    "serverIp": "0.0.0.0",'
-    insertafter: '"nginxConfig": {'
+- name: Wait for CapRover service to start
+  wait_for:
+    host: localhost
+    port: 3000
+    state: started
+    timeout: 120
   become: true
-  register: config_updated
   when: not caprover_data_exists
 
-- name: Wait for configuration to apply.
+- name: Ensure CapRover password is set correctly
+  block:
+    - name: Generate bcrypt hash for new password
+      delegate_to: localhost
+      run_once: true
+      set_fact:
+        caprover_password_hash: "{{ vault_caprover_password | password_hash('bcrypt') }}"
+
+    - name: Update CapRover configuration with password
+      replace:
+        path: /captain/data/config-captain.json
+        regexp: '"hashedPassword":.*'
+        replace: '"hashedPassword": "{{ caprover_password_hash }}"'
+      register: config_updated
+      become: true
+
+    - name: Restart CapRover if configuration changed
+      command: docker service update --force captain-captain
+      become: true
+      when: config_updated.changed
+
+    - name: Wait for CapRover service to restart
+      wait_for:
+        host: localhost
+        port: 3000
+        state: started
+        timeout: 60
+      become: true
+      when: config_updated.changed
+  when: not caprover_data_exists
+
+- name: Configure CapRover to bind to all interfaces
+  replace:
+    path: /captain/data/config-captain.json
+    regexp: '"nginxConfig": {'
+    replace: '"nginxConfig": {\n    "serverIp": "0.0.0.0",'
+  become: true
+  when: not caprover_data_exists
+  register: config_updated
+  failed_when: false
+
+- name: Wait for configuration to apply
   wait_for:
     path: /captain/data/config-captain.json
     timeout: 60
@@ -273,47 +248,6 @@
   become: true
   when: caprover_data_exists
 
-- name: Wait for CapRover service to start
-  wait_for:
-    host: localhost
-    port: 3000
-    state: started
-    timeout: 60
-
-- name: Ensure CapRover password is set correctly.
-  become: true
-  block:
-    - name: Generate bcrypt hash for new password
-      delegate_to: localhost
-      run_once: true
-      set_fact:
-        caprover_password_hash: "{{ vault_caprover_password | password_hash('bcrypt') }}"
-
-    - name: Update CapRover configuration
-      replace:
-        path: /captain/data/config-captain.json
-        regexp: '"hashedPassword":.*'
-        replace: '"hashedPassword": "{{ caprover_password_hash }}"'
-      register: config_updated
-
-    - name: Restart CapRover if configuration changed
-      command: docker service update --force captain-captain
-      when: config_updated.changed
-
-    - name: Verify CapRover login
-      uri:
-        url: http://localhost:3000/api/v2/login
-        method: POST
-        body_format: json
-        body:
-          password: "{{ vault_caprover_password }}"
-        status_code: 200
-        timeout: 10
-      register: login_result
-      until: login_result.status == 200
-      retries: 5
-      delay: 5
-
 - name: Verify CapRover API health
   uri:
     url: http://localhost:3000/api/health
@@ -323,3 +257,19 @@
   until: result.status == 200
   retries: 60
   delay: 10
+
+- name: Verify CapRover login
+  uri:
+    url: http://localhost:3000/api/v2/login
+    method: POST
+    body_format: json
+    body:
+      password: "{{ vault_caprover_password }}"
+    status_code: 200
+    timeout: 10
+  register: login_result
+  until: login_result.status == 200
+  retries: 10
+  delay: 10
+  become: true
+  when: not caprover_data_exists
