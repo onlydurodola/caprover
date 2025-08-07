@@ -195,7 +195,7 @@
   become: true
   when: not caprover_data_exists
 
-- name: Deploy CapRover service
+- name: Deploy CapRover service..
   community.docker.docker_stack:
     name: captain
     state: present
