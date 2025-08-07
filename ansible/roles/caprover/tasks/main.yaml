@@ -98,14 +98,6 @@
     state: present
   become: true
 
-- name: Install jsondiff on control node
-  delegate_to: localhost
-  run_once: true
-  pip:
-    name: jsondiff
-    state: present
-  become: false
-  
 - name: Ensure Docker is running
   systemd:
     name: docker
@@ -174,6 +166,21 @@
     mode: '0664'
   become: true
   when: not caprover_data_exists
+
+- name: Install jsondiff in system Python
+  delegate_to: localhost
+  run_once: true
+  become: false
+  command: /usr/bin/python3 -m pip install jsondiff
+
+- name: Verify jsondiff installation
+  delegate_to: localhost
+  run_once: true
+  become: false
+  command: /usr/bin/python3 -c "import jsondiff"
+  register: jsondiff_check
+  failed_when: jsondiff_check.rc != 0
+  ignore_errors: false
 
 - name: Deploy CapRover service
   community.docker.docker_stack:
