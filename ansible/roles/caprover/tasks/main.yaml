@@ -139,7 +139,7 @@
   become: true
   when: not caprover_data_exists
 
-- name: Install CapRover service
+- name: Install CapRover service.
   community.docker.docker_swarm_service:
     name: caprover
     image: caprover/caprover:latest
