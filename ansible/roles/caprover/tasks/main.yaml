@@ -11,6 +11,14 @@
     group: ubuntu
   become: true
 
+- name: Check if CapRover services are running
+  shell: |
+    docker service ls --format '{{ '{{' }}.Name{{ '}}' }}' | grep -q 'captain_captain-captain'
+  register: services_running
+  ignore_errors: true
+  changed_when: false
+  become: true
+
 - name: Check for existing CapRover data
   stat:
     path: /captain/data/config-captain.json
@@ -19,7 +27,34 @@
 
 - name: Set CapRover data exists fact
   set_fact:
-    caprover_data_exists: "{{ caprover_config.stat.exists }}"
+    caprover_data_exists: "{{ caprover_config.stat.exists and services_running.rc == 0 }}"
+
+- name: Clean up zombie installation
+  block:
+    - name: Remove stale CapRover config
+      file:
+        path: /captain/data/config-captain.json
+        state: absent
+      become: true
+      
+    - name: Force leave Docker swarm
+      shell: docker swarm leave --force
+      become: true
+      ignore_errors: true
+      
+    - name: Clean Docker artifacts
+      shell: |
+        docker system prune -af
+        docker volume prune -f
+      become: true
+      ignore_errors: true
+      
+    - name: Reset CapRover data exists fact
+      set_fact:
+        caprover_data_exists: false
+  when: 
+    - caprover_config.stat.exists
+    - services_running.rc != 0
 
 - block:
     - name: Clean up any existing Docker artifacts
@@ -74,10 +109,6 @@
         state: started
         enabled: true
       become: true
-      retries: 3
-      delay: 5
-      register: result
-      until: result is success
 
     - name: Add ubuntu to docker group
       user:
@@ -99,7 +130,7 @@
         driver: overlay
         attachable: yes
       become: true
-    
+
     - name: Pull required Docker images
       docker_image:
         name: "{{ item }}"
@@ -131,67 +162,65 @@
         - captain-nginx-data
       become: true
 
-    - name: Deploy CapRover stack using docker-compose
+    - name: Deploy CapRover stack using docker-compose v2
       community.docker.docker_compose_v2:
         project_src: /captain
+        project_name: captain
+        state: present
         definition:
           version: '3.8'
-          services: "{{ docker_compose_services }}"
-          networks: "{{ docker_compose_networks }}"
-          volumes: "{{ docker_compose_volumes }}"
+          services:
+            captain-captain:
+              image: caprover/caprover:1.14.0
+              ports:
+                - "3000:3000"
+              volumes:
+                - "/var/run/docker.sock:/var/run/docker.sock"
+                - "captain-data:/captain"
+              environment:
+                CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
+                ACCEPTED_TERMS: "true"
+                CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
+                MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
+                BY_PASS_PROXY_CHECK: "TRUE"
+                USE_EXISTING_SWARM: "true"
+                SKIP_SWARM_MODE_CHECK: "true"
+              networks:
+                - "captain-overlay-network"
+              deploy:
+                restart_policy:
+                  condition: "on-failure"
+                  delay: "10s"
+                  max_attempts: 5
+                  window: "60s"
+            
+            captain-certbot:
+              image: caprover/certbot-sleeping:v2.11.0
+              volumes:
+                - "captain-data:/captain"
+              networks:
+                - "captain-overlay-network"
+            
+            captain-nginx:
+              image: nginx:1.27.2
+              ports:
+                - "80:80"
+                - "443:443"
+              volumes:
+                - "captain-nginx-data:/etc/nginx/conf.d"
+              networks:
+                - "captain-overlay-network"
+          
+          networks:
+            captain-overlay-network:
+              driver: "overlay"
+              attachable: true
+          
+          volumes:
+            captain-data:
+            captain-nginx-data:
       become: true
-      vars:
-        docker_compose_services: |
-          captain-captain:
-            image: caprover/caprover:1.14.0
-            ports:
-              - "3000:3000"
-            volumes:
-              - /var/run/docker.sock:/var/run/docker.sock
-              - captain-data:/captain
-            environment:
-              CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
-              ACCEPTED_TERMS: "true"
-              CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
-              MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
-              BY_PASS_PROXY_CHECK: "TRUE"
-              USE_EXISTING_SWARM: "true"
-              SKIP_SWARM_MODE_CHECK: "true"
-            networks:
-              - captain-overlay-network
-            deploy:
-              restart_policy:
-                condition: on-failure
-                delay: 10s
-                max_attempts: 5
-                window: 60s
-          
-          captain-certbot:
-            image: caprover/certbot-sleeping:v2.11.0
-            volumes:
-              - captain-data:/captain
-            networks:
-              - captain-overlay-network
-          
-          captain-nginx:
-            image: nginx:1.27.2
-            ports:
-              - "80:80"
-              - "443:443"
-            volumes:
-              - captain-nginx-data:/etc/nginx/conf.d
-            networks:
-              - captain-overlay-network
-        
-        docker_compose_networks: |
-          captain-overlay-network:
-            driver: overlay
-            attachable: true
-        
-        docker_compose_volumes: |
-          captain-data:
-          captain-nginx-data:
-          
+
     - name: Wait for CapRover to start
       wait_for:
         port: 3000
@@ -218,12 +247,12 @@
       become: true
 
     - name: Restart CapRover service
-      community.docker.docker_compose_v2:
-        name: captain-captain
+      docker_service:
+        name: captain_captain-captain
         state: restarted
       become: true
 
-  when: not caprover_data_exists
+  when: not caprover_data_exists|bool
 
 - name: Check Docker services
   command: docker service ls
@@ -236,7 +265,7 @@
     var: docker_services.stdout_lines
 
 - name: Check CapRover logs
-  command: docker service logs captain-captain --tail 50
+  command: docker service logs captain_captain-captain --tail 50
   register: caprover_logs
   failed_when: false
   become: true
