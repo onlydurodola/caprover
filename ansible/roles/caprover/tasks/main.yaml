@@ -99,7 +99,7 @@
         driver: overlay
         attachable: yes
       become: true
-
+    
     - name: Pull required Docker images
       docker_image:
         name: "{{ item }}"
@@ -132,7 +132,7 @@
       become: true
 
     - name: Deploy CapRover stack using docker-compose
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: /captain
         definition:
           version: '3.8'
