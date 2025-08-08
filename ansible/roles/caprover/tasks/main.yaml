@@ -131,61 +131,67 @@
         - captain-nginx-data
       become: true
 
-    - name: Create CapRover service
-      docker_service:
-        name: captain-captain
-        image: caprover/caprover:1.14.0
-        networks:
-          - captain-overlay-network
-        mounts:
-          - source: /var/run/docker.sock
-            target: /var/run/docker.sock
-            type: bind
-          - source: captain-data
-            target: /captain
-            type: volume
-        env:
-          CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
-          ACCEPTED_TERMS: "true"
-          CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
-          MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
-          BY_PASS_PROXY_CHECK: "TRUE"
-          USE_EXISTING_SWARM: "true"
-          SKIP_SWARM_MODE_CHECK: "true"
-        ports:
-          - "3000:3000"
-        restart_policy: on-failure
-        restart_policy_delay: 10s
-        restart_policy_attempts: 5
+    - name: Deploy CapRover stack using docker-compose
+      community.docker.docker_compose:
+        project_src: /captain
+        definition:
+          version: '3.8'
+          services: "{{ docker_compose_services }}"
+          networks: "{{ docker_compose_networks }}"
+          volumes: "{{ docker_compose_volumes }}"
       become: true
-
-    - name: Create Certbot service
-      docker_service:
-        name: captain-certbot
-        image: caprover/certbot-sleeping:v2.11.0
-        networks:
-          - captain-overlay-network
-        mounts:
-          - source: captain-data
-            target: /captain
-            type: volume
-      become: true
-
-    - name: Create Nginx service
-      docker_service:
-        name: captain-nginx
-        image: nginx:1.27.2
-        networks:
-          - captain-overlay-network
-        mounts:
-          - source: captain-nginx-data
-            target: /etc/nginx/conf.d
-            type: volume
-        ports:
-          - "80:80"
-          - "443:443"
-      become: true
-
+      vars:
+        docker_compose_services: |
+          captain-captain:
+            image: caprover/caprover:1.14.0
+            ports:
+              - "3000:3000"
+            volumes:
+              - /var/run/docker.sock:/var/run/docker.sock
+              - captain-data:/captain
+            environment:
+              CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
+              ACCEPTED_TERMS: "true"
+              CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
+              MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
+              BY_PASS_PROXY_CHECK: "TRUE"
+              USE_EXISTING_SWARM: "true"
+              SKIP_SWARM_MODE_CHECK: "true"
+            networks:
+              - captain-overlay-network
+            deploy:
+              restart_policy:
+                condition: on-failure
+                delay: 10s
+                max_attempts: 5
+                window: 60s
+          
+          captain-certbot:
+            image: caprover/certbot-sleeping:v2.11.0
+            volumes:
+              - captain-data:/captain
+            networks:
+              - captain-overlay-network
+          
+          captain-nginx:
+            image: nginx:1.27.2
+            ports:
+              - "80:80"
+              - "443:443"
+            volumes:
+              - captain-nginx-data:/etc/nginx/conf.d
+            networks:
+              - captain-overlay-network
+        
+        docker_compose_networks: |
+          captain-overlay-network:
+            driver: overlay
+            attachable: true
+        
+        docker_compose_volumes: |
+          captain-data:
+          captain-nginx-data:
+          
     - name: Wait for CapRover to start
       wait_for:
         port: 3000

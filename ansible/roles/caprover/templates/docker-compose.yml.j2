@@ -1,0 +1,51 @@
+version: '3.8'
+services:
+  captain-captain:
+    image: caprover/caprover:1.14.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - captain-data:/captain
+    environment:
+      CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
+      ACCEPTED_TERMS: "true"
+      CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
+      MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
+      BY_PASS_PROXY_CHECK: "TRUE"
+      USE_EXISTING_SWARM: "true"
+      SKIP_SWARM_MODE_CHECK: "true"
+    networks:
+      - captain-overlay-network
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 60s
+
+  captain-certbot:
+    image: caprover/certbot-sleeping:v2.11.0
+    volumes:
+      - captain-data:/captain
+    networks:
+      - captain-overlay-network
+
+  captain-nginx:
+    image: nginx:1.27.2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - captain-nginx-data:/etc/nginx/conf.d
+    networks:
+      - captain-overlay-network
+
+networks:
+  captain-overlay-network:
+    driver: overlay
+    attachable: true
+
+volumes:
+  captain-data:
+  captain-nginx-data:
