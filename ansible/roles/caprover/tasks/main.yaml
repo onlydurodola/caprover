@@ -164,7 +164,6 @@
 
     - name: Deploy CapRover stack using docker-compose v2
       community.docker.docker_compose_v2:
-        project_src: /captain
         project_name: captain
         state: present
         definition:
@@ -193,14 +192,12 @@
                   delay: "10s"
                   max_attempts: 5
                   window: "60s"
-            
             captain-certbot:
               image: caprover/certbot-sleeping:v2.11.0
               volumes:
                 - "captain-data:/captain"
               networks:
                 - "captain-overlay-network"
-            
             captain-nginx:
               image: nginx:1.27.2
               ports:
@@ -210,12 +207,10 @@
                 - "captain-nginx-data:/etc/nginx/conf.d"
               networks:
                 - "captain-overlay-network"
-          
           networks:
             captain-overlay-network:
               driver: "overlay"
               attachable: true
-          
           volumes:
             captain-data:
             captain-nginx-data:
@@ -241,15 +236,13 @@
 
     - name: Set CapRover password
       shell: |
-        HASH=$(docker exec $(docker ps -q -f name=captain-captain) \
+        HASH=$(docker exec $(docker ps -q -f name=captain_captain-captain) \
           node /usr/src/app/node_modules/bcryptjs/bin/bcrypt {{ vault_caprover_password }})
         sed -i "s/\"hashedPassword\":.*/\"hashedPassword\": \"$HASH\"/" /captain/data/config-captain.json
       become: true
 
     - name: Restart CapRover service
-      docker_service:
-        name: captain_captain-captain
-        state: restarted
+      command: docker service update --force captain_captain-captain
       become: true
 
   when: not caprover_data_exists|bool
