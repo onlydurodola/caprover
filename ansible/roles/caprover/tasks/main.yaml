@@ -104,7 +104,7 @@
     sed -i "s/\"hashedPassword\":.*/\"hashedPassword\": \"$HASH\"/" /captain/data/config-captain.json
   become: true
 
-- name: Restart CapRover container
+- name: Restart CapRover container..
   docker_container:
     name: caprover
     state: started
