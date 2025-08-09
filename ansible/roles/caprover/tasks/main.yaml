@@ -7,14 +7,43 @@
     path: /captain
     state: directory
     mode: '0755'
-    owner: ubuntu
-    group: ubuntu
+  when: not caprover_data_exists
+
+- name: Download Docker GPG key
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+  when: not caprover_data_exists
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+  when: not caprover_data_exists
+
+- name: Install Docker components
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: true
+  when: not caprover_data_exists
+
+- name: Check Docker Swarm state
+  command: docker info --format '{% raw %}{{ .Swarm.LocalNodeState }}{% endraw %}'
+  register: swarm_state
+  changed_when: false
+  ignore_errors: true
   become: true
 
 
 - name: Initialize Docker Swarm if needed
   command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
-  when: 
+  when:
     - swarm_state.stdout | trim != 'active'
     - not caprover_data_exists
   become: true
@@ -121,8 +150,17 @@
       - "/captain:/captain"
     env:
       ACCEPTED_TERMS: "true"
-      MAIN_NODE_IP_ADDRESS='127.0.0.1'
-
+      CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
+      MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
+      BY_PASS_PROXY_CHECK: "TRUE"
+      USE_EXISTING_SWARM: "false"
+    restart_config:
+      condition: on-failure
+      delay: 10s
+      max_attempts: 5
+      window: 60s
+  become: true
+  when: not caprover_data_exists
   become: true
 
 - name: Wait for CapRover initialization
