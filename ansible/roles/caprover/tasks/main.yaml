@@ -107,7 +107,8 @@
 - name: Restart CapRover container
   docker_container:
     name: caprover
-    state: restarted
+    state: started
+    restart: yes
   become: true
 
 - name: Verify CapRover API health
