@@ -86,7 +86,7 @@ module "waf" {
   count       = var.waf_enabled ? 1 : 0
   source      = "./modules/waf"
   alb_arn     = module.alb.alb_arn
-  allowed_ips = var.allowed_ips
+  allowed_ips = concat(var.allowed_ips, ["${module.vpc.nat_eip}/32"])
   env         = var.env
 
 }
@@ -108,10 +108,10 @@ resource "random_id" "bucket_suffix" {
 }
 
 resource "aws_s3_bucket" "ansible_ssm" {
-  # Bucket names must be globally unique. A random suffix helps.
+  # Bucket name
   bucket = "caprover-ansible-ssm-${random_id.bucket_suffix.hex}"
 
-  # A best practice to prevent accidental deletion of a production bucket
+  # Prevent accidental deletion of a production bucket
   # Set to true for ephemeral environments if needed.
   force_destroy = true
 }

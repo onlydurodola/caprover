@@ -49,15 +49,15 @@ resource "aws_lb_target_group" "caprover_https" {
 }
 
 resource "aws_lb_target_group" "caprover_dashboard" {
-  name     = "caprover-dashboard-tg-${var.env}"
-  port     = 3000
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  name        = "caprover-dash-tg-${var.env}-${random_id.tg_suffix.hex}"
+  port        = 3000
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
 
   health_check {
     path                = "/api/health"
     interval            = 30
-    timeout             = 10
+    timeout             = 20
     healthy_threshold   = 2
     unhealthy_threshold = 2
     matcher             = "200-399"
@@ -65,6 +65,26 @@ resource "aws_lb_target_group" "caprover_dashboard" {
 
   lifecycle {
     create_before_destroy = true
+  }
+}
+
+resource "aws_lb_listener_rule" "caprover_health_check" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 50
+
+  action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "OK"
+      status_code  = "200"
+    }
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/health"]
+    }
   }
 }
 
@@ -173,7 +193,7 @@ resource "aws_lb_listener_rule" "gitlab_http" {
 
 resource "aws_lb_listener_rule" "gitlab_https" {
   listener_arn = aws_lb_listener.https.arn
-  priority     = 100
+  priority     = 200
 
   action {
     type             = "forward"
@@ -205,7 +225,7 @@ resource "aws_lb_listener_rule" "caprover_dashboard" {
 
 resource "aws_lb_listener_rule" "caprover_dashboard_https" {
   listener_arn = aws_lb_listener.https.arn
-  priority     = 200
+  priority     = 100
 
   action {
     type             = "forward"

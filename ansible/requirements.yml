@@ -4,4 +4,6 @@ collections:
   - name: community.aws
     version: 9.3.0
   - name: community.general
+    version: 11.1.2
   - name: community.docker
+    version: 4.7.0

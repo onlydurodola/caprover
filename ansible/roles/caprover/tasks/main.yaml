@@ -1,40 +1,13 @@
 - name: Verify SSM connectivity
   wait_for_connection:
-    timeout: 120
+    timeout: 300
 
-- name: Check for existing CapRover data
-  stat:
-    path: /captain/data/config-captain.yml
-  register: caprover_config
-  become: true
-
-- name: Set CapRover data exists fact
-  set_fact:
-    caprover_data_exists: "{{ caprover_config.stat.exists }}"
-
-- name: Install prerequisites
-  apt:
-    name:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - software-properties-common
-      - git
-      - ufw
-      - nodejs
-      - npm
-      - gnupg-agent
-    state: present
-    update_cache: true
-  when: not caprover_data_exists
-  retries: 5
-  delay: 10
-
-- name: Create Docker GPG key directory
+- name: Ensure /captain directory exists
   file:
-    path: /etc/apt/keyrings
+    path: /captain
     state: directory
     mode: '0755'
+<<<<<<< HEAD
   when: not caprover_data_exists
 
 - name: Download Docker GPG key
@@ -66,7 +39,12 @@
   register: swarm_state
   changed_when: false
   ignore_errors: true
+=======
+    owner: ubuntu
+    group: ubuntu
+>>>>>>> origin/revert/work
   become: true
+
 
 - name: Initialize Docker Swarm if needed
   command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
@@ -99,72 +77,83 @@
   become: true
   when: not caprover_data_exists
 
-- name: Set Docker socket permissions
-  file:
-    path: /var/run/docker.sock
-    owner: root
-    group: docker
-    mode: '0660'
+- name: Gather package facts
+  package_facts:
+    manager: auto
+
+- name: Configure firewall
+  shell: |
+    ufw allow 80,443,3000,996,7946,4789,2377/tcp
+    ufw allow 7946,4789,2377/udp
+    ufw --force enable
   become: true
-  when: not caprover_data_exists
 
-- name: Configure and enable UFW
-  ufw:
-    rule: allow
-    port: "{{ item.port }}"
-    proto: "{{ item.proto }}"
-  loop:
-    - { port: 80, proto: tcp }
-    - { port: 443, proto: tcp }
-    - { port: 3000, proto: tcp }
-    - { port: 996, proto: tcp }
-    - { port: 7946, proto: tcp }
-    - { port: 7946, proto: udp }
-    - { port: 4789, proto: udp }
-    - { port: 2377, proto: tcp }
-    - { port: 22, proto: tcp }
+- name: Install Docker
+  block:
+    - name: Install prerequisites
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+        update_cache: true
+      become: true
+      
 
-- name: Create CapRover data directory
-  file:
-    path: /captain/data
-    state: directory
-    mode: '0755'
-  become: true
-  when: not caprover_data_exists
 
-- name: Configure CapRover to use existing swarm
-  copy:
-    content: '{"useExistingSwarm": "true"}'
-    dest: /captain/data/config-override.json
-  become: true
-  when: not caprover_data_exists
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      become: true
 
-- name: Install CapRover service
-  community.docker.docker_swarm_service:
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      become: true
+
+    - name: Install Docker components
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+      become: true
+      when: (ansible_facts.packages is not defined) or ('docker-ce' not in ansible_facts.packages)
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+      become: true
+
+    - name: Add ubuntu to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+      become: true
+  when: "'docker' not in ansible_facts.packages"
+
+- name: Install CapRover
+  docker_container:
     name: caprover
     image: caprover/caprover:latest
-    publish:
-      - published_port: 80
-        target_port: 80
-        protocol: tcp
-        mode: host
-      - published_port: 443
-        target_port: 443
-        protocol: tcp
-        mode: host
-      - published_port: 3000
-        target_port: 3000
-        protocol: tcp
-        mode: host
-    mounts:
-      - source: /var/run/docker.sock
-        target: /var/run/docker.sock
-        type: bind
-      - source: /captain
-        target: /captain
-        type: bind
+    state: started
+    restart_policy: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "3000:3000"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/captain:/captain"
     env:
-      CAPROVER_ROOT_PASSWORD: "{{ vault_caprover_password }}"
       ACCEPTED_TERMS: "true"
       CAPROVER_ROOT_DOMAIN: "{{ domain_name }}"
       MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
@@ -177,43 +166,53 @@
       window: 60s
   become: true
   when: not caprover_data_exists
-
-- name: Configure CapRover to bind to all interfaces
-  replace:
-    path: /captain/data/config-captain.json
-    regexp: '"nginxConfig": {'
-    replace: '"nginxConfig": {\n    "serverIp": "0.0.0.0",'
   become: true
-  when: not caprover_data_exists
-  register: config_updated
-  failed_when: false  # Continue even if file not found yet
 
-- name: Wait for configuration to apply
+- name: Wait for CapRover initialization
   wait_for:
-    path: /captain/data/config-captain.json
-    timeout: 60
+    port: 3000
+    delay: 10
+    timeout: 300
   become: true
-  when: not caprover_data_exists and config_updated.changed
 
-- name: Restart CapRover service
-  command: docker service update --force captain-captain
+- name: Set CapRover password
+  shell: |
+    HASH=$(docker exec caprover node /usr/src/app/node_modules/bcryptjs/bin/bcrypt {{ vault_caprover_password }})
+    sed -i "s/\"hashedPassword\":.*/\"hashedPassword\": \"$HASH\"/" /captain/data/config-captain.json
   become: true
-  when: not caprover_data_exists
 
-- name: Start CapRover from existing data
-  community.docker.docker_stack:
-    name: captain
-    state: present
-    with_registry_auth: yes
+- name: Restart CapRover container..
+  docker_container:
+    name: caprover
+    state: started
+    restart: yes
   become: true
-  when: caprover_data_exists
 
 - name: Verify CapRover API health
   uri:
-    url: http://localhost:3000/api/health
+    url: http://localhost:3000/api/v2/health
     status_code: 200
-    timeout: 30
+    timeout: 10
   register: result
   until: result.status == 200
-  retries: 60
+  retries: 30
   delay: 10
+  become: true
+
+- name: Check Docker containers
+  command: docker ps
+  register: docker_containers
+  become: true
+
+- name: Display Docker containers
+  debug:
+    var: docker_containers.stdout_lines
+
+- name: Check CapRover logs
+  command: docker logs caprover --tail 50
+  register: caprover_logs
+  become: true
+
+- name: Display CapRover logs
+  debug:
+    var: caprover_logs.stdout_lines
