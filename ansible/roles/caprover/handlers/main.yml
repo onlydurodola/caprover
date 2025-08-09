@@ -13,4 +13,9 @@
   command: gitlab-ctl reconfigure
   async: 600 
   poll: 
-  #
+
+- name: restart caprover
+  shell: |
+    docker service update --force captain-captain
+    sleep 10  # Allow time for restart
+  become: true

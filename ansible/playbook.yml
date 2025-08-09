@@ -1,4 +1,5 @@
 - hosts: caprover
+  gather_facts: true
   connection: community.aws.aws_ssm
   vars_files:
     - vault.yml
@@ -21,6 +22,7 @@
     - caprover
 
 - hosts: gitlab
+  gather_facts: true
   connection: community.aws.aws_ssm
   vars_files:
     - vault.yml
@@ -45,3 +47,4 @@
         mode: '0755'
   roles:
     - gitlab
+  # 

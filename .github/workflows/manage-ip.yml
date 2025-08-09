@@ -1,0 +1,71 @@
+name: Manage Whitelisted IPs
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform (add/remove/list)'
+        required: true
+        default: 'list'
+      ip:
+        description: 'IP address in CIDR format (e.g., 192.168.1.1/32)'
+        required: false
+
+jobs:
+  manage-ip:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - name: Get WAF IP Set information
+        id: get-waf-ipset
+        run: |
+          IPSET_ID=$(aws wafv2 list-ip-sets --scope REGIONAL --query "IPSets[?Name=='prod-whitelist'].Id" --output text)
+          LOCK_TOKEN=$(aws wafv2 get-ip-set --name prod-whitelist --id $IPSET_ID --scope REGIONAL --query 'LockToken' --output text)
+          CURRENT_IPS=$(aws wafv2 get-ip-set --name prod-whitelist --id $IPSET_ID --scope REGIONAL --query 'IPSet.Addresses' --output json | jq -r '.[]')
+          
+          echo "IPSET_ID=$IPSET_ID" >> $GITHUB_ENV
+          echo "LOCK_TOKEN=$LOCK_TOKEN" >> $GITHUB_ENV
+          echo "CURRENT_IPS=$(echo $CURRENT_IPS | tr '\n' ' ')" >> $GITHUB_ENV
+          
+          echo "Current IPs:"
+          echo $CURRENT_IPS
+
+      - name: Add IP
+        if: ${{ inputs.action == 'add' && inputs.ip != '' }}
+        run: |
+          NEW_IPS="${{ env.CURRENT_IPS }} ${{ inputs.ip }}"
+          aws wafv2 update-ip-set \
+            --name prod-whitelist \
+            --id ${{ env.IPSET_ID }} \
+            --scope REGIONAL \
+            --addresses $NEW_IPS \
+            --lock-token ${{ env.LOCK_TOKEN }}
+          echo "Added ${{ inputs.ip }} to whitelist"
+
+      - name: Remove IP
+        if: ${{ inputs.action == 'remove' && inputs.ip != '' }}
+        run: |
+          NEW_IPS=$(echo "${{ env.CURRENT_IPS }}" | sed "s|${{ inputs.ip }}||g")
+          aws wafv2 update-ip-set \
+            --name prod-whitelist \
+            --id ${{ env.IPSET_ID }} \
+            --scope REGIONAL \
+            --addresses $NEW_IPS \
+            --lock-token ${{ env.LOCK_TOKEN }}
+          echo "Removed ${{ inputs.ip }} from whitelist"
+
+      - name: List IPs
+        if: ${{ inputs.action == 'list' }}
+        run: |
+          echo "Current whitelisted IPs:"
+          echo "${{ env.CURRENT_IPS }}"
