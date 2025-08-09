@@ -58,7 +58,7 @@
       - docker-ce-cli
       - containerd.io
     state: present
-    update_cache: true 
+    update_cache: true
   when: not caprover_data_exists
 
 - name: Check Docker Swarm state
@@ -70,7 +70,7 @@
 
 - name: Initialize Docker Swarm if needed
   command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
-  when: 
+  when:
     - swarm_state.stdout | trim != 'active'
     - not caprover_data_exists
   become: true
@@ -170,7 +170,7 @@
       MAIN_NODE_IP_ADDRESS: "{{ ansible_default_ipv4.address }}"
       BY_PASS_PROXY_CHECK: "TRUE"
       USE_EXISTING_SWARM: "false"
-    restart_config:  
+    restart_config:
       condition: on-failure
       delay: 10s
       max_attempts: 5
