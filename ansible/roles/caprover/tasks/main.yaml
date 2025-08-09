@@ -15,6 +15,13 @@
   package_facts:
     manager: auto
 
+- name: Configure firewall
+  shell: |
+    ufw allow 80,443,3000,996,7946,4789,2377/tcp
+    ufw allow 7946,4789,2377/udp
+    ufw --force enable
+  become: true
+
 - name: Install Docker
   block:
     - name: Install prerequisites
@@ -67,13 +74,6 @@
       become: true
   when: "'docker' not in ansible_facts.packages"
 
-- name: Configure firewall
-  shell: |
-    ufw allow 80,443,3000,996,7946,4789,2377/tcp
-    ufw allow 7946,4789,2377/udp
-    ufw --force enable
-  become: true
-
 - name: Install CapRover
   docker_container:
     name: caprover
@@ -89,6 +89,8 @@
       - "/captain:/captain"
     env:
       ACCEPTED_TERMS: "true"
+      MAIN_NODE_IP_ADDRESS='127.0.0.1'
+
   become: true
 
 - name: Wait for CapRover initialization
