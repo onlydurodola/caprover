@@ -7,7 +7,6 @@
     path: /captain
     state: directory
     mode: '0755'
-<<<<<<< HEAD
   when: not caprover_data_exists
 
 - name: Download Docker GPG key
@@ -39,10 +38,6 @@
   register: swarm_state
   changed_when: false
   ignore_errors: true
-=======
-    owner: ubuntu
-    group: ubuntu
->>>>>>> origin/revert/work
   become: true
 
 
