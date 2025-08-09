@@ -11,6 +11,10 @@
     group: ubuntu
   become: true
 
+- name: Gather package facts
+  package_facts:
+    manager: auto
+
 - name: Install Docker
   block:
     - name: Install prerequisites
@@ -23,6 +27,8 @@
         state: present
         update_cache: true
       become: true
+      
+
 
     - name: Add Docker GPG key
       apt_key:
@@ -44,6 +50,7 @@
           - containerd.io
         state: present
       become: true
+      when: (ansible_facts.packages is not defined) or ('docker-ce' not in ansible_facts.packages)
 
     - name: Start and enable Docker service
       systemd:
